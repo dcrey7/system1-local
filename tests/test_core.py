@@ -152,9 +152,9 @@ def test_choice_ties_do_not_depend_on_input_order():
 
 
 def test_tournament_70_options_preserves_group_mass():
-    first = {token: 0.8 / 61 for token in ALPHABET}
+    first = {token: 0.8 / 35 for token in ALPHABET}
     first["A"] = 0.2
-    second = {token: 0.4 / 7 for token in ALPHABET[:8]}
+    second = {token: 0.4 / 33 for token in ALPHABET[:34]}
     second["A"] = 0.6
     backend = FakeBackend([tokens(first), tokens(second), tokens({"A": 0.7, "B": 0.3})])
     levels = [f"level{i}" for i in range(70)]
@@ -166,11 +166,11 @@ def test_tournament_70_options_preserves_group_mass():
     )
     probabilities = result["answers"]["q"]["probabilities"]
     assert len(backend.prompts) == 3
-    assert "9. level61" in backend.prompts[0]
-    assert "H. level69" in backend.prompts[1]
-    assert "A. level0\nB. level62" in backend.prompts[2]
+    assert "9. level35" in backend.prompts[0]
+    assert "7. level69" in backend.prompts[1]
+    assert "A. level0\nB. level36" in backend.prompts[2]
     assert probabilities["level0"] == pytest.approx(0.14)
-    assert probabilities["level62"] == pytest.approx(0.18)
+    assert probabilities["level36"] == pytest.approx(0.18)
     assert sum(probabilities.values()) == pytest.approx(1)
     assert result["usage"]["forward_passes"] == 3
 
@@ -210,3 +210,58 @@ def test_recursive_tournament_with_small_alphabet():
 def test_invalid_questions_fail_before_backend(question):
     with pytest.raises(ValidationError):
         system_one("", {"q": question}, backend=FakeBackend([]))
+
+
+def test_criteria_descriptions_and_level_order():
+    score = Score(
+        type="score", instructions="Risk?", criteria={"10": "high", "2": "low"}
+    )
+    assert score.levels == ["2", "10"]
+    assert "A. 2: low\nB. 10: high" in build_prompt("", score, {"A": "2", "B": "10"})
+    named = Score(
+        type="score", instructions="Risk?", criteria={"low": None, "high": "danger"}
+    )
+    assert named.levels == ["low", "high"]
+    noul = Noul(
+        type="noul",
+        instructions="Review?",
+        criteria={"false": "No review", "true": "Inspect"},
+    )
+    assert "A. yes: Inspect\nB. no: No review" in build_prompt(
+        "", noul, {"A": "yes", "B": "no"}
+    )
+
+
+def test_request_accepts_model_but_rejects_unknown_fields():
+    payload = {
+        "state": "",
+        "model": "ignored",
+        "questions": {"q": {"type": "noul", "instructions": "?"}},
+    }
+    assert Request(**payload).model == "ignored"
+    with pytest.raises(ValidationError):
+        Request(**payload, unknown=True)
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        {"type": "score", "instructions": "?"},
+        {"type": "score", "instructions": "?", "criteria": {}},
+        {
+            "type": "score",
+            "instructions": "?",
+            "levels": ["a"],
+            "criteria": {"b": None},
+        },
+        {"type": "noul", "instructions": "?", "criteria": {"yes": "yes", "no": "no"}},
+        {"type": "noul", "instructions": "?", "criteria": {"true": "yes"}},
+    ],
+)
+def test_invalid_review_schema(question):
+    with pytest.raises(ValidationError):
+        Request(state="", questions={"q": question})
+
+
+def test_option_alphabet_is_uppercase_then_digits():
+    assert ALPHABET == "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

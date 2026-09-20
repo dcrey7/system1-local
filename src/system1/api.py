@@ -23,8 +23,7 @@ def create_app(engine: SystemOne | None = None) -> FastAPI:
     app = FastAPI(title="System One", lifespan=lifespan)
 
     @app.post("/v1/systemone")
-    async def decide(request: Request) -> dict:
-        # The model's single slot processes one complete decision at a time.
+    def decide(request: Request) -> dict:
         try:
             return decider.decide(request)
         except (LowCoverageError, httpx.HTTPError, KeyError, IndexError) as error:

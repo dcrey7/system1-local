@@ -50,7 +50,7 @@ def read_probabilities(
         if math.isnan(logprob) or logprob > 0:
             raise ValueError("Invalid token log probability")
         token = item["token"].strip()
-        # Case is significant: A and a can refer to different options.
+        # Lowercase tokens must not contribute mass to uppercase IDs.
         if token in mass:
             mass[token] += math.exp(logprob)
     coverage = sum(mass.values())

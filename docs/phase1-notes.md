@@ -157,3 +157,153 @@ The sandbox denies the socket connection. This does not establish whether the
 external server is healthy. No server is started or stopped. The live token
 alphabet, coverage, answers, model latency, and real-data calibration remain
 unverified. No model or dataset is downloaded.
+
+## Phase 1b
+
+Recorded: 2026-09-20 16:00 CEST. Time comes from
+`date "+%Y-%m-%d %H:%M %Z"`.
+This section supersedes the phase 1 behavior where it differs.
+
+### Review fixes
+
+- Noul accepts optional `true` and `false` criteria. Prompts show their
+  descriptions beside `yes` and `no`.
+- Score accepts levels or criteria. Integer-string criteria keys sort
+  numerically. Other keys retain their input order. Descriptions remain in
+  prompts. If both forms are supplied, their ordered levels must match.
+- Requests accept an ignored `model` string. Unknown fields still fail.
+- The decision API uses a synchronous route. FastAPI runs inference in a
+  worker thread. Backend HTTP requests remain serialized by the shared lock.
+- The ID alphabet is uppercase letters followed by digits, with no lowercase
+  IDs. Token matching remains exact after stripping whitespace.
+- Choice and score CLI options accept `name=instructions:options` as well as
+  the old `name:options` form.
+- The loader reads local parquet files first. Only a missing split uses
+  `datasets.load_dataset`. No Hub request runs during local conversion.
+
+### Benchmark behavior
+
+`src/system1/data.py` converts local rows to JSONL with parsed state,
+questions, labels, and full gold data. The actual parquet files use lists
+for score criteria, unlike the dictionary example in the spec. The loader
+converts each list to string index keys and retains every description.
+
+The generated files are:
+
+- `data/typed_decisions_train.jsonl`: 1,200 cases and 6,000 questions.
+- `data/typed_decisions_test.jsonl`: 400 cases and 2,000 questions.
+
+Every converted request and gold target passes validation. Gold probability
+sums differ from one by at most approximately 0.000001 in the local data.
+Scoring normalizes rounded gold distributions. It rejects negative or
+nonfinite values, mismatched option keys, and sum errors greater than 0.005.
+
+Benchmark records align predicted and gold probabilities by label. Noul uses
+P(yes) >= 0.5, including ties, against the true/false gold label. Accuracy and
+10-bin ECE use hard labels. Log loss uses cross entropy against soft gold
+probabilities. Brier averages squared differences over options, then over
+questions. This differs from the phase 1 hard-label sum of squared errors.
+Legacy JSONL cases without gold distributions use one-hot targets.
+
+Score MAE compares the predicted expected numeric level with gold `score`.
+Named levels in legacy cases use their zero-based indices. Reports include
+individual question results, aggregates by question name, workflow and type,
+overall metrics, decision latency median/p95, and per-case forward passes.
+The printed table includes log loss, score MAE, and all six reference values
+from the spec. These reference values are not measurements of this run.
+
+`--workflow` filters test cases before `--limit` selects the first matching
+cases. `--permutations` controls both train and test inference.
+`--fit-temperature train.jsonl` fits hard-label negative log likelihood per
+question type on all training cases. It saves raw training predictions in
+`data/preds_train.jsonl`. Cache fingerprints include case content, dictionary
+order, model name, permutations, and a cache version. Changed inputs or
+settings cause fresh inference. Completed cases survive an interrupted run.
+Calibration fits always ignore an existing temperature file.
+
+Test inference runs once. Before and after metrics use the same predictions
+and latency samples. The JSON report uses the top-level metrics for the
+calibrated results and `before_calibration` for raw results. Tests check cache
+reuse, input/order/setting changes, and the absence of repeated test inference.
+No real training cache, calibration fit, or live report is produced here,
+because the sandbox blocks the model connection.
+
+### Dependencies and environment
+
+The optional `bench` extra pins `datasets==5.0.0` and `pyarrow==25.0.1`.
+The declarations use:
+
+```bash
+UV_CACHE_DIR=/tmp/system1-uv-cache uv add --offline --frozen --optional bench datasets==5.0.0 pyarrow==25.0.1
+```
+
+An earlier offline resolution attempt fails because the registry cache lacks
+FastAPI metadata. The new lock entries are recovered from the existing local
+`nanoeval/uv.lock`, with registry URLs and artifact hashes retained. Existing
+project package versions remain unchanged. `uv lock --check --offline` passes.
+
+A full offline sync cannot install from the incomplete cache. A selective
+sync also fails on the copied parquet cache layout and removes environment
+packages. The local environment is restored from matching installed package
+versions in `pipecat_buddy` and `nanoeval`, using their wheel RECORD entries.
+The restored project environment includes the benchmark dependencies.
+Automatic uv sync attempts during recovery fail DNS resolution; no package
+is downloaded. Subsequent commands force uv offline. No dataset or model is
+downloaded. A fresh install remains unverified in this sandbox.
+
+In an environment with package access, install with `uv sync --locked --extra
+bench`. The final checks here use the project environment without PYTHONPATH
+or UV_NO_SYNC overrides:
+
+```bash
+export UV_CACHE_DIR=/tmp/system1-uv-cache UV_OFFLINE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+uv run ruff check --fix .
+uv run ruff format .
+uv run ruff check .
+uv run pytest -q
+uv run system1 fetch-typed-decisions
+uv lock --check --offline
+git diff --check
+```
+
+### Verification results
+
+```text
+$ uv run ruff check .
+All checks passed!
+$ uv run pytest -q
+.....................................................................    [100%]
+69 passed in 0.54s
+$ uv run system1 fetch-typed-decisions
+data/typed_decisions_train.jsonl
+data/typed_decisions_test.jsonl
+$ uv lock --check --offline
+Resolved 57 packages in 0.39ms
+$ git diff --check
+(no output)
+```
+
+Tests block socket connections and DNS. Parquet tests write small local
+fixtures. The Hub fallback uses a mock. API tests use ASGITransport and assert
+that inference runs on a worker thread. Timer wakeups keep the test event loop
+moving when the sandbox blocks its worker-completion wakeup socket.
+
+Earlier checks report `55 passed in 0.38s`, `67 passed in 0.55s`,
+and `69 passed in 0.55s`.
+An intermediate run reports `1 failed, 66 passed in 1.36s`: the new cache test
+supplies A/B tokens for a score permutation that uses B/C. Correcting the
+fixture resolves that failure. An earlier API check hangs on the sandbox
+wakeup limitation and is interrupted before the timer workaround is added.
+
+The requested live check is attempted once:
+
+```text
+$ uv run system1 bench data/typed_decisions_test.jsonl --limit 5
+Error: [Errno 1] Operation not permitted
+```
+
+It exits with status 1. The sandbox denies the connection to port 8010.
+This does not indicate a model-server bug. Live scores, latency, and the live
+printed table remain unverified. The table and JSON report paths pass with
+FakeBackend in unit tests. No server is started or stopped. Nothing is committed.
+The justfile adds `fetch`, `bench-smoke`, and `bench-calibrate` recipes.

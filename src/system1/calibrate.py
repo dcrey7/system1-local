@@ -143,3 +143,43 @@ def save_calibration(
     values: dict[str, float], path: Path = Path("calibration.json")
 ) -> None:
     path.write_text(json.dumps(validate_temperatures(values), indent=2) + "\n")
+
+
+def soft_targets(
+    probs: Rows, targets: Rows
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """Validate predictions and normalize rounded gold distributions."""
+    rows = probability_rows(probs)
+    gold = [np.asarray(row, dtype=float) for row in targets]
+    if len(rows) != len(gold):
+        raise ValueError("Supply one gold distribution per prediction")
+    for row, target in zip(rows, gold):
+        if (
+            target.shape != row.shape
+            or not np.isfinite(target).all()
+            or (target < 0).any()
+            or abs(target.sum() - 1) > 0.005
+        ):
+            raise ValueError("Gold probabilities must match options and sum to 1")
+    return rows, [row / row.sum() for row in gold]
+
+
+def soft_log_loss(probs: Rows, targets: Rows) -> float:
+    """Return mean cross entropy against gold distributions."""
+    rows, gold = soft_targets(probs, targets)
+    return float(
+        np.mean(
+            [
+                -np.dot(target, np.log(np.clip(row, 1e-300, 1)))
+                for row, target in zip(rows, gold)
+            ]
+        )
+    )
+
+
+def soft_brier(probs: Rows, targets: Rows) -> float:
+    """Return squared error averaged over options, then questions."""
+    rows, gold = soft_targets(probs, targets)
+    return float(
+        np.mean([np.square(row - target).mean() for row, target in zip(rows, gold)])
+    )

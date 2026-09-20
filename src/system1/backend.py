@@ -1,13 +1,13 @@
 """Sequential HTTP inference and canned test responses."""
 
 from collections.abc import Iterable
-from string import ascii_lowercase, ascii_uppercase, digits
+from string import ascii_uppercase, digits
 from threading import Lock
 from typing import Protocol, TypedDict
 
 import httpx
 
-ALPHABET = ascii_uppercase + ascii_lowercase + digits
+ALPHABET = ascii_uppercase + digits
 SERVER_LOCK = Lock()
 
 

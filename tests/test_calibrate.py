@@ -109,3 +109,17 @@ def test_metrics_reject_invalid_inputs(probs, labels):
     for metric in (ece, brier, log_loss):
         with pytest.raises(ValueError):
             metric(probs, labels)
+
+
+def test_soft_metrics_known_values_and_rounding():
+    from system1.calibrate import soft_brier, soft_log_loss
+
+    assert soft_brier([[0.8, 0.2]], [[0.6, 0.4]]) == pytest.approx(0.04)
+    assert soft_log_loss([[0.8, 0.2]], [[0.6, 0.4]]) == pytest.approx(
+        -0.6 * np.log(0.8) - 0.4 * np.log(0.2)
+    )
+    assert soft_brier([[0.6, 0.4]], [[0.6, 0.4]]) == pytest.approx(0)
+    assert soft_brier([[0.5, 0.5]], [[0.499999, 0.499999]]) == pytest.approx(0)
+    assert np.isfinite(soft_log_loss([[1, 0]], [[0.5, 0.5]]))
+    with pytest.raises(ValueError, match="Gold probabilities"):
+        soft_brier([[0.5, 0.5]], [[0.2, 0.2]])
