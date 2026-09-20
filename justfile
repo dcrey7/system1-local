@@ -20,3 +20,6 @@ bench-smoke:
 
 bench-calibrate:
     uv run system1 bench data/typed_decisions_test.jsonl --fit-temperature data/typed_decisions_train.jsonl --out report.json
+
+demo:
+    uv run python scripts/demo.py

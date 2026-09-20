@@ -29,7 +29,7 @@ Question types: `choice` (pick one option, each with an optional description), `
 
 ## Demo, step by step
 
-A real run on the RTX 3090, job fit for a candidate, five questions in one call. Script: the same calls the CLI makes, printed stage by stage.
+A real run on the RTX 3090, job fit for a candidate, five questions in one call. Script: `scripts/demo.py` (`just demo`), the same calls the CLI makes, printed stage by stage.
 
 **1. The prompt.** State first, then every question with its options. Every option gets its own letter, unique across the whole call.
 
