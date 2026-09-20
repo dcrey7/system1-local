@@ -3,7 +3,7 @@ title: Phase 2 results, all answers in one call on Gemma 4 12B
 date: 2026-09-20 19:57 CEST
 author: Claude (runs and review), Codex gpt-6-astra (code)
 type: results
-status: final, audited (see phase2-audit.md, verdict PASS with caveats)
+status: revision 2 final and audited; revision 3 measured and rejected (see the revision 3 section); revision 4 pending
 ---
 
 # Phase 2 results: all answers in one call
@@ -68,7 +68,56 @@ Codex gpt-6-astra audited the numbers adversarially (`docs/phase2-audit.md`, scr
 - Code: `src/system1/core.py` (`build_multi_prompt`, `build_grammar`, `read_multi`, `SystemOne._multi`), `src/system1/backend.py` (`complete_multi`, `probe`), `bench --mode multi`, `ask --mode multi`, API `mode` field. Commits 4c28227 and 7fa18ab.
 - Spec `docs/phase2-spec.md`, Codex notes `docs/phase2-notes.md`, audit `docs/phase2-audit.md`.
 
+## Revision 3 (run 2026-09-20 21:29 CEST): reseeded shuffles and a probability floor made it worse
+
+Revision 3 applied the two audit suggestions: a different question order per shuffle (`random.Random(1000 + k)` plus a rotation so a different question comes first each time) and a probability floor for option ids missing from the top 20 list. Same model, server, test set and metric code as above. Fresh temperature fit on the train split (`calibration_multi.json` now holds choice 2.48, noul 4.19, score 3.45).
+
+| | Rev 2, 3 shuffles | Rev 3, 3 shuffles | Rev 2, 1 call | Rev 3, 1 call |
+|---|---|---|---|---|
+| Accuracy | **0.7430** | 0.7230 | 0.7370 | 0.6870 |
+| ECE after temperature | 0.030 | 0.040 | 0.044 | 0.103 |
+| Brier, card scale | 0.125 | 0.135 | 0.154 | 0.209 |
+| Log loss after temperature | 1.048 | 1.066 | 4.10 | 1.24 |
+| Score MAE | 0.331 | 0.362 | 0.371 | 0.419 |
+| Failed cases (test) | 2 | 2 | 0 | 0 |
+| Time per case | 1,380 ms | 1,347 ms | 508 ms | 492 ms |
+| Zero probability entries | 1 | 0 | 288 | 0 |
+
+The floor did exactly what the audit predicted: the one call log loss fell from 4.10 to 1.24 because no option gets probability zero any more. It cannot change a top answer (a floored entry never exceeds a real one), so every accuracy change comes from the question order.
+
+**The question order moves accuracy by 2 to 5 points.** The per type and per question breakdown shows where:
+
+| 3 shuffles | Rev 2 | Rev 3 |
+|---|---|---|
+| choice (600) | 0.737 | 0.733 |
+| noul (600) | 0.823 | 0.837 |
+| score (800) | 0.688 | 0.630 |
+| urgency (400, score) | 0.610 | 0.522 |
+
+Every workflow ends with `urgency`. Revision 2's three orders were `[3,1,2,4,0]`, `[3,2,0,4,1]`, `[3,1,2,0,4]` (question index 3 first every time, urgency 4th, 4th and 5th). Revision 3's orders are `[4,2,1,0,3]`, `[3,4,1,0,2]`, `[0,3,4,1,2]` (urgency 1st, 2nd and 3rd). Asked before the other questions, urgency loses 9 points. The one call pass shows it is not only urgency: with the single revision 3 order `[4,2,1,0,3]`, `matches_order` (invoice_processing, noul) fell from 0.96 to 0.69 because it moved from first to last, after the model had already committed to a `disposition`. Answers written earlier in the reply are context for the later lines, so a question answered after a related judgment follows that judgment, right or wrong.
+
+In simple words: in one call the model fills the form top to bottom and reads its own earlier answers. Facts should come before judgments, and the summary judgment (urgency, risk) last. A random order breaks that, and averaging three random orders only averages the damage. Phase 1 (one question per call) had no such effect, and also no such gain: its 0.7065 is below both revisions.
+
+Decision: revision 4 keeps the question order the caller gives (the caller knows the dependencies), never shuffles questions, keeps shuffling the option letters, and keeps the floor.
+### Order experiment (2026-09-20 21:51 CEST)
+
+One call per case, no shuffles, raw accuracy on the full test set (400 cases, 2,000 decisions), seven fixed question orders. Each order is a reordered copy of the test file, so the engine saw the identity order (`scratch/order_experiment.py`). The revision 2 and revision 3 rows reproduce the benchmark's one call numbers to the fourth decimal, which checks the harness. About 500 ms per case in every row.
+
+| Order | Accuracy | choice | noul | score | urgency |
+|---|---|---|---|---|---|
+| Revision 2 shuffle 0 (question 4 first, urgency 4th) `[3, 1, 2, 4, 0]` | 0.7370 | 0.720 | 0.832 | 0.679 | 0.605 |
+| Given order (as the caller wrote it; urgency last) `[0, 1, 2, 3, 4]` | 0.7315 | 0.693 | 0.822 | 0.693 | 0.625 |
+| Sorted by type: noul, choice, score `noul,choice,score` | 0.7230 | 0.675 | 0.815 | 0.690 | 0.618 |
+| Reversed (urgency first) `[4, 3, 2, 1, 0]` | 0.7055 | 0.685 | 0.820 | 0.635 | 0.552 |
+| Urgency first, rest as given `[4, 0, 1, 2, 3]` | 0.7035 | 0.703 | 0.793 | 0.636 | 0.530 |
+| Sorted by type: score, choice, noul `score,choice,noul` | 0.6985 | 0.662 | 0.803 | 0.647 | 0.568 |
+| Revision 3 shuffle 0 (urgency first, question 4 last) `[4, 2, 1, 0, 3]` | 0.6870 | 0.680 | 0.772 | 0.629 | 0.542 |
+
+Reading: 5 points between the best and the worst order from one model and one prompt format. Every order that puts `urgency` early loses 6 to 10 points on that question. Sorting by type does not beat the caller's order: facts first pushes the choice questions back and they lose. The best fixed order is revision 2's first shuffle, which by luck starts with a fact (a noul in three of four workflows) and keeps urgency late. Revision 4 keeps the caller's order; the README tells callers to write fact checks first and summary judgments last.
+
 ## Changelog
 
 - 2026-09-20 19:57 CEST: First version with the full test set numbers for 3 shuffles and 1 call.
 - 2026-09-20 20:11 CEST: Folded in the Codex audit: Jev measured on this same test split; Brier on the card scale; ECE caveats; failed cases are uniform guesses, not wrong; one order log loss comes from top 20 zeros; speed at 20 questions marked as expected, not measured.
+- 2026-09-20 21:29 CEST: Revision 3 measured on the full test set: 0.723 (3 shuffles) and 0.687 (1 call) against 0.743 and 0.737. Cause traced to question order; floor kept; revision 4 decision recorded.
+- 2026-09-20 21:51 CEST: Order experiment, seven fixed orders on the full test set, 1 call each; the caller's order is second best at 0.7315, spread 0.687 to 0.737.
