@@ -70,9 +70,13 @@ def main() -> None:
     print()
 
     t = time.perf_counter()
-    tokens, n_prompt = backend.complete_multi(prompt, grammar, max_tokens=8 * len(order) + 8)
+    tokens, n_prompt = backend.complete_multi(
+        prompt, grammar, max_tokens=8 * len(order) + 8
+    )
     ms = (time.perf_counter() - t) * 1000
-    print(f"=== 3. THE MODEL'S REPLY ({n_prompt} prompt tokens, {len(tokens)} generated, {ms:.0f} ms, one call) ===")
+    print(
+        f"=== 3. THE MODEL'S REPLY ({n_prompt} prompt tokens, {len(tokens)} generated, {ms:.0f} ms, one call) ==="
+    )
     print(repr("".join(tk["token"] for tk in tokens)))
     print()
 
@@ -90,11 +94,15 @@ def main() -> None:
 
     print("=== 5. READ AND NORMALISE OVER THE QUESTION'S OWN IDS ===")
     for name, (probs, coverage) in zip(order, read_multi(tokens, ids_per_question)):
-        labelled = ", ".join(f"{label} {p:.3f}" for label, p in zip(assigned[name].values(), probs))
+        labelled = ", ".join(
+            f"{label} {p:.3f}" for label, p in zip(assigned[name].values(), probs)
+        )
         print(f"  {name:12} coverage {coverage:.3f}  {labelled}")
     print()
 
-    print("=== 6. FINAL ANSWER (3 shuffles averaged, temperature applied), the product output ===")
+    print(
+        "=== 6. FINAL ANSWER (3 shuffles averaged, temperature applied), the product output ==="
+    )
     t = time.perf_counter()
     final = Request(state=STATE, questions=QUESTIONS, permutations=3, mode="multi")
     out = SystemOne(backend).decide(final, mode="multi")
@@ -103,8 +111,12 @@ def main() -> None:
         if "noul" in answer:
             print(f"  {name:12} true with probability {answer['noul']:.2f}")
         else:
-            probs = ", ".join(f"{k} {v:.2f}" for k, v in answer["probabilities"].items())
-            print(f"  {name:12} {answer[answer['type']]:8} confidence {answer['confidence']:.2f}   {probs}")
+            probs = ", ".join(
+                f"{k} {v:.2f}" for k, v in answer["probabilities"].items()
+            )
+            print(
+                f"  {name:12} {answer[answer['type']]:8} confidence {answer['confidence']:.2f}   {probs}"
+            )
     print(f"  ({out['usage']['calls']} calls, {ms:.0f} ms)")
     backend.close()
 
