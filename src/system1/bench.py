@@ -18,7 +18,7 @@ from system1.calibrate import (
     soft_targets,
 )
 from system1.core import MODEL, SystemOne
-from system1.schema import Request, options
+from system1.schema import Mode, Request, options
 
 REFERENCES = {
     "majority baseline": 0.520,
@@ -84,6 +84,7 @@ def run_cases(
     limit: int | None = None,
     workflow: str | None = None,
     cache_path: Path | None = None,
+    mode: Mode = "single",
 ) -> tuple[list[dict], list[dict]]:
     """Run raw predictions, reusing matching cached training cases."""
     if limit is not None and limit < 1:
@@ -105,22 +106,24 @@ def run_cases(
                 state=case["state"],
                 questions=case["questions"],
                 permutations=permutations,
+                mode=mode,
             )
             targets = [target_record(case, name, request) for name in request.questions]
+            fingerprint_data = {
+                "version": 1,
+                "model": MODEL,
+                "case": case,
+                "permutations": permutations,
+            }
+            if mode == "multi":
+                fingerprint_data["mode"] = mode
             fingerprint = hashlib.sha256(
-                json.dumps(
-                    {
-                        "version": 1,
-                        "model": MODEL,
-                        "case": case,
-                        "permutations": permutations,
-                    },
-                ).encode()
+                json.dumps(fingerprint_data).encode()
             ).hexdigest()
             if fingerprint in cached:
                 result = cached[fingerprint]
             else:
-                result = engine.decide(request, calibrated=False)
+                result = engine.decide(request, calibrated=False, mode=mode)
                 if cache_path is not None:
                     cache_path.parent.mkdir(parents=True, exist_ok=True)
                     with cache_path.open("a") as cache:
@@ -174,14 +177,17 @@ def metrics(records: list[dict]) -> dict:
 def summarize(records: list[dict], usages: list[dict]) -> dict:
     latencies = [usage["latency_ms"] for usage in usages]
     passes = [usage["forward_passes"] for usage in usages]
+    calls = [usage["calls"] for usage in usages]
     report = {
         "overall": metrics(records),
         "decisions": len(usages),
         "latency_ms": {
+            "mean": float(np.mean(latencies)),
             "median": float(np.median(latencies)),
             "p95": float(np.percentile(latencies, 95)),
         },
         "forward_passes": {"total": sum(passes), "per_case": float(np.mean(passes))},
+        "calls": {"total": sum(calls), "per_case": float(np.mean(calls))},
         "cases": usages,
         "question_results": [{**record, **metrics([record])} for record in records],
     }
@@ -201,11 +207,21 @@ def benchmark(
     *,
     limit: int | None = None,
     workflow: str | None = None,
-    cache_path: Path = Path("data/preds_train.jsonl"),
+    cache_path: Path | None = None,
+    mode: Mode = "single",
 ) -> dict:
     """Evaluate once and apply fitted temperatures to the saved distributions."""
+    calibration_path = engine.calibration_for(mode)
+    if cache_path is None:
+        cache_path = Path(
+            "data/preds_train_multi.jsonl"
+            if mode == "multi"
+            else "data/preds_train.jsonl"
+        )
     if train is not None:
-        training, _ = run_cases(train, engine, permutations, cache_path=cache_path)
+        training, _ = run_cases(
+            train, engine, permutations, cache_path=cache_path, mode=mode
+        )
         grouped = defaultdict(list)
         for record in training:
             grouped[record["type"]].append(record)
@@ -215,11 +231,11 @@ def benchmark(
             )
             for kind, rows in grouped.items()
         }
-        save_calibration(temperatures, engine.calibration_path)
+        save_calibration(temperatures, calibration_path)
     else:
-        temperatures = load_calibration(engine.calibration_path)
+        temperatures = load_calibration(calibration_path)
     records, usages = run_cases(
-        path, engine, permutations, limit=limit, workflow=workflow
+        path, engine, permutations, limit=limit, workflow=workflow, mode=mode
     )
     before = summarize(records, usages)
     calibrated = [
@@ -268,10 +284,13 @@ def report_table(report: dict) -> str:
         )
     lines.extend(metric_table(report))
     lines.append(
-        f"Latency (ms): median={report['latency_ms']['median']:.2f}, p95={report['latency_ms']['p95']:.2f}"
+        f"Latency (ms): mean={report['latency_ms']['mean']:.2f}, median={report['latency_ms']['median']:.2f}, p95={report['latency_ms']['p95']:.2f}"
     )
     lines.append(
         f"Forward passes: total={report['forward_passes']['total']}, per case={report['forward_passes']['per_case']:.2f}"
+    )
+    lines.append(
+        f"Calls: total={report['calls']['total']}, per case={report['calls']['per_case']:.2f}"
     )
     lines.append("Reference accuracies (dataset card, 1,600-case set; not this run):")
     lines.extend(f"  {name}: {value:.3f}" for name, value in REFERENCES.items())

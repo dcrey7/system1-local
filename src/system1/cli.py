@@ -1,6 +1,7 @@
 """Commands for decisions, serving, and benchmarks."""
 
 import json
+from enum import Enum
 from pathlib import Path
 from typing import Annotated
 
@@ -17,6 +18,11 @@ from system1.schema import Request
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 
 
+class ModeOption(str, Enum):
+    single = "single"
+    multi = "multi"
+
+
 def fail(error: Exception) -> None:
     typer.echo(f"Error: {error}", err=True)
     raise typer.Exit(1)
@@ -29,6 +35,7 @@ def ask(
     noul: Annotated[list[str] | None, typer.Option()] = None,
     score: Annotated[list[str] | None, typer.Option()] = None,
     permutations: Annotated[int, typer.Option(min=1)] = 3,
+    mode: Annotated[ModeOption, typer.Option()] = ModeOption.single,
 ) -> None:
     """Print answer JSON for named questions."""
     backend = GemmaBackend()
@@ -61,12 +68,26 @@ def ask(
             json.loads(state) if state.lstrip().startswith(("{", "[")) else state
         )
         request = Request(
-            state=parsed_state, questions=questions, permutations=permutations
+            state=parsed_state,
+            questions=questions,
+            permutations=permutations,
+            mode=mode.value,
         )
         typer.echo(
-            json.dumps(SystemOne(backend).decide(request), indent=2, allow_nan=False)
+            json.dumps(
+                SystemOne(backend).decide(request, mode=mode.value),
+                indent=2,
+                allow_nan=False,
+            )
         )
-    except (OSError, ValueError, httpx.HTTPError, KeyError, IndexError) as error:
+    except (
+        OSError,
+        ValueError,
+        RuntimeError,
+        httpx.HTTPError,
+        KeyError,
+        IndexError,
+    ) as error:
         fail(error)
     finally:
         backend.close()
@@ -100,6 +121,7 @@ def bench(
     out: Annotated[Path, typer.Option()] = Path("report.json"),
     limit: Annotated[int | None, typer.Option(min=1)] = None,
     workflow: Annotated[str | None, typer.Option()] = None,
+    mode: Annotated[ModeOption, typer.Option()] = ModeOption.single,
 ) -> None:
     """Evaluate JSONL cases and optionally fit on separate training cases."""
     backend = GemmaBackend()
@@ -111,10 +133,18 @@ def bench(
             fit_temperature,
             limit=limit,
             workflow=workflow,
+            mode=mode.value,
         )
         out.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
         typer.echo(report_table(report))
-    except (OSError, ValueError, httpx.HTTPError, KeyError, IndexError) as error:
+    except (
+        OSError,
+        ValueError,
+        RuntimeError,
+        httpx.HTTPError,
+        KeyError,
+        IndexError,
+    ) as error:
         fail(error)
     finally:
         backend.close()

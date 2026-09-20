@@ -13,6 +13,7 @@ from pydantic import (
 )
 
 State = str | dict[str, JsonValue] | list[JsonValue]
+Mode = Literal["single", "multi"]
 Label = Annotated[str, Field(min_length=1)]
 
 
@@ -70,6 +71,7 @@ class Request(BaseModel):
     state: State
     questions: dict[Label, Question] = Field(min_length=1)
     permutations: int = Field(default=3, ge=1, strict=True)
+    mode: Mode = "single"
 
 
 def options(question: QuestionBase) -> dict[str, str | None]:

@@ -25,8 +25,14 @@ def create_app(engine: SystemOne | None = None) -> FastAPI:
     @app.post("/v1/systemone")
     def decide(request: Request) -> dict:
         try:
-            return decider.decide(request)
-        except (LowCoverageError, httpx.HTTPError, KeyError, IndexError) as error:
+            return decider.decide(request, mode=request.mode)
+        except (
+            LowCoverageError,
+            RuntimeError,
+            httpx.HTTPError,
+            KeyError,
+            IndexError,
+        ) as error:
             raise HTTPException(status_code=502, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
