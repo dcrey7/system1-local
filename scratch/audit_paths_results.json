@@ -1,0 +1,142 @@
+{
+  "conversion": {
+    "train": {
+      "rows": 1200,
+      "convert_row_mismatches": 0,
+      "length_match": true
+    },
+    "test": {
+      "rows": 400,
+      "convert_row_mismatches": 0,
+      "length_match": true
+    }
+  },
+  "prompt_gold_mutation": {
+    "single": {
+      "cases": 400,
+      "captured_calls": 6000,
+      "identical_prompts_and_grammars": true,
+      "identical_predictions": true,
+      "sentinel_in_prompts": false
+    },
+    "multi": {
+      "cases": 400,
+      "captured_calls": 1200,
+      "identical_prompts_and_grammars": true,
+      "identical_predictions": true,
+      "sentinel_in_prompts": false
+    }
+  },
+  "schema_rejected_extra_keys": [
+    "request/gold",
+    "question/gold",
+    "request/gold_score",
+    "question/gold_score",
+    "request/gold_probabilities",
+    "question/gold_probabilities",
+    "request/label",
+    "question/label",
+    "request/answers",
+    "question/answers",
+    "request/majority_answers",
+    "question/majority_answers"
+  ],
+  "input_target_key_hits": [],
+  "parser": {
+    "whitespace_aggregate": {
+      "p": [
+        0.8333333333333334,
+        0.1666666666666667
+      ],
+      "coverage": 0.6
+    },
+    "0.499999": {
+      "accepted": false
+    },
+    "0.5": {
+      "accepted": true,
+      "p": [
+        1.0,
+        0.0
+      ],
+      "coverage": 0.5
+    },
+    "answer_token_read": [
+      [
+        [
+          0.6666666666666667,
+          0.33333333333333337
+        ],
+        0.8999999999999999
+      ]
+    ],
+    "merged_rejected": true
+  },
+  "reports": {
+    "report_multi.json": {
+      "macro_question_ece": 0.12007748893437521,
+      "first_gold_argmax_accuracy": 0.741,
+      "ties_in_gold": 35,
+      "per_workflow": {
+        "agent_trace_observability": 0.684,
+        "customer_service": 0.786,
+        "invoice_processing": 0.792,
+        "security_incidents": 0.71
+      }
+    },
+    "report_full.json": {
+      "macro_question_ece": 0.12951919501491488,
+      "first_gold_argmax_accuracy": 0.7055,
+      "ties_in_gold": 35,
+      "per_workflow": {
+        "agent_trace_observability": 0.67,
+        "customer_service": 0.736,
+        "invoice_processing": 0.726,
+        "security_incidents": 0.694
+      }
+    },
+    "report_multi_p1.json": {
+      "macro_question_ece": 0.11650153752643023,
+      "first_gold_argmax_accuracy": 0.7355,
+      "ties_in_gold": 35,
+      "per_workflow": {
+        "agent_trace_observability": 0.678,
+        "customer_service": 0.794,
+        "invoice_processing": 0.768,
+        "security_incidents": 0.708
+      }
+    }
+  },
+  "option_counts_per_case": {
+    "18": 100,
+    "20": 100,
+    "16": 100,
+    "17": 100
+  },
+  "questions_without_criteria": {
+    "noul": 200
+  },
+  "question_index_orders": [
+    [
+      3,
+      1,
+      2,
+      4,
+      0
+    ],
+    [
+      3,
+      2,
+      0,
+      4,
+      1
+    ],
+    [
+      3,
+      1,
+      2,
+      0,
+      4
+    ]
+  ]
+}

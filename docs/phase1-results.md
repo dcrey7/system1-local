@@ -47,7 +47,7 @@ Latency: median 2,418 ms per case, p95 2,865 ms, 15 forward passes per case (5 q
 
 ## Reference points (dataset card, 1,600 case set)
 
-majority 0.520, factor ceiling 0.704, teacher self agreement 0.735, Jev published 0.727 (third party), Laya zero shot 0.36, Laya fine tuned on train 0.766.
+majority 0.520, factor ceiling 0.704, teacher self agreement 0.735, Jev published 0.727 (benchmark author's API run on this same 400 case test split, 18 Sep 2026), Laya zero shot 0.36, Laya fine tuned on train 0.766.
 
 ## What it means
 
@@ -59,3 +59,4 @@ majority 0.520, factor ceiling 0.704, teacher self agreement 0.735, Jev publishe
 ## Changelog
 
 - 2026-09-20 17:06 CEST - Created from report_full.json.
+- 2026-09-20 20:11 CEST: Corrected the Jev reference: it was measured on this same test split, not a separate set (found by the phase 2 audit).
