@@ -2,6 +2,9 @@ check:
     uv run ruff check .
     uv run pytest -q
 
+test-live:
+    uv run pytest -q -m live tests/test_live.py
+
 format:
     uv run ruff check --fix .
     uv run ruff format .
