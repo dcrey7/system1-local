@@ -10,22 +10,24 @@ Benchmark: [LocalLLaMA/typed-decisions](https://huggingface.co/datasets/LocalLLa
 
 | | Jev 1.13 (from the dataset card) | This repo, one call per question | This repo, all questions in one call |
 |---|---|---|---|
-| Accuracy | 0.727 | 0.7065 | 0.743 |
-| Brier, card scale | 0.148 | 0.145 | 0.125 |
-| Calibration error (top label ECE, 10 bins) | 0.144 | 0.032 | 0.030 |
-| Time per case, 5 questions | 710 ms (cloud) | 2.4 s | 1.4 s, or 0.5 s with one shuffle |
+| Accuracy | 0.727 | 0.7065 | 0.737 |
+| Brier, card scale | 0.148 | 0.145 | 0.136 |
+| Calibration error (top label ECE, 10 bins) | 0.144 | 0.032 | 0.026 |
+| Time per case, 5 questions | 710 ms (cloud) | 2.4 s | 1.35 s, or 0.5 s with one shuffle (accuracy 0.7315) |
 
-Measured on an RTX 3090 with a 4 bit Gemma 4 12B and its MTP draft. Details, per type and per workflow numbers, and the caveats are in `docs/phase2-results.md`. An independent adversarial audit of the numbers is in `docs/phase2-audit.md`.
+Measured on an RTX 3090 with a 4 bit Gemma 4 12B and its MTP draft, with the questions in the order the dataset gives them (the same order Jev receives). Details, per type and per workflow numbers, the earlier revisions (including a 0.743 from a fixed question order the shuffle seed picked by luck) and the caveats are in `docs/phase2-results.md`. An independent adversarial audit of the numbers is in `docs/phase2-audit.md`.
 
 ## How it works
 
 1. The prompt holds the state and all the questions. Every option gets a one character id, unique across the call.
 2. A grammar forces the model to write exactly one line per question, `Q1: C`, `Q2: A`, and so on.
 3. At each answer token the server returns the model's top 20 token probabilities. The probabilities of that question's ids are read and normalised. That is the answer distribution.
-4. The call is repeated with the options and questions shuffled (3 times by default) and the distributions are averaged.
+4. The call is repeated with the option letters shuffled (3 times by default) and the distributions are averaged. The questions stay in the order you give them.
 5. One temperature per question type, fitted once on the benchmark's train split, softens the output so that 0.8 means right about 80 percent of the time.
 
 Question types: `choice` (pick one option, each with an optional description), `score` (ordered levels, returns the distribution and the expected level), `noul` (a statement, returns the probability that it is true).
+
+**Question order matters.** In one call the model writes its answers one line after another and reads its own earlier lines, so a question answered after a related judgment follows that judgment. Put fact checks first, decisions next, and summary judgments (urgency, risk, priority) last. On the benchmark, seven fixed orders of the same five questions ranged from 0.687 to 0.737 accuracy with one call; the order the dataset authors wrote gave 0.7315 and moving urgency to the front cost 3 points overall and 10 on that question (`docs/phase2-results.md`, order experiment). The repo keeps your order; it does not reorder or shuffle questions.
 
 ## Demo, step by step
 
