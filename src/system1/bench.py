@@ -153,13 +153,13 @@ def run_cases(
             for record in targets:
                 size = len(record["options"])
                 records.append({**record, "probabilities": [1 / size] * size})
-            # Failed decisions do not return token or call counts.
+            # One call is a lower bound in both modes; failed decisions expose no counts.
             usages.append(
                 {
                     "id": case["id"],
                     "input_tokens": 0,
                     "forward_passes": 0,
-                    "calls": 0,
+                    "calls": 1,
                     "latency_ms": (perf_counter() - start) * 1000,
                     "failure_line": line_number,
                 }
@@ -316,6 +316,8 @@ def report_table(report: dict) -> str:
     lines.append(
         f"Calls: total={report['calls']['total']}, per case={report['calls']['per_case']:.2f}"
     )
-    lines.append("Reference accuracies (dataset card, 1,600-case set; not this run):")
+    lines.append(
+        "Reference accuracies (dataset card, their harness on the same test split; not this run):"
+    )
     lines.extend(f"  {name}: {value:.3f}" for name, value in REFERENCES.items())
     return "\n".join(lines)

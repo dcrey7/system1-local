@@ -73,6 +73,10 @@ def test_multi_fit_and_default_cache_leave_single_calibration_untouched(tmp_path
     assert report["latency_ms"]["mean"] == report["cases"][0]["latency_ms"]
     table = report_table(report)
     assert "Calls: total=3, per case=3.00" in table
+    assert (
+        "Reference accuracies (dataset card, their harness on the same test split; not this run):"
+        in table
+    )
     assert "Latency (ms): mean=" in table
     assert "type/noul" in table
     benchmark(path, engine, permutations=1, train=path, mode="multi")
@@ -219,6 +223,8 @@ def test_low_coverage_case_is_uniform_and_run_continues(tmp_path, capsys, mode):
     records, usages = run_cases(path, engine, 1, cache_path=cache, mode=mode)
     report = summarize(records, usages)
     assert report["failures"] == {"count": 1, "lines": [2]}
+    assert usages[0]["calls"] == 1
+    assert report["calls"]["total"] == 1 + usages[1]["calls"]
     assert report["decisions"] == 2
     assert report["overall"]["count"] == 6
     assert "Failures: 1" in report_table(report)
