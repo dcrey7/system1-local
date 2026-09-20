@@ -1,0 +1,60 @@
+START Sun 20 Sep 19:43:29 CEST 2026
+Warning: data/typed_decisions_train.jsonl:466: Option coverage 0.475499 is below 0.5; top tokens: [{'id': 630, 'token': ' R', 'bytes': [32, 82], 'logprob': -0.6455240845680237}, {'id': 562, 'token': ' A', 'bytes': [32, 65], 'logprob': -1.402256965637207}, {'id': 603, 'token': ' B', 'bytes': [32, 66], 'logprob': -1.472060203552246}, {'id': 565, 'token': ' C', 'bytes': [32, 67], 'logprob': -10.703625679016113}, {'id': 555, 'token': ' S', 'bytes': [32, 83], 'logprob': -10.938387870788574}, {'id': 236794, 'token': 'R', 'bytes': [82], 'logprob': -11.255061149597168}, {'id': 646, 'token': ' N', 'bytes': [32, 78], 'logprob': -11.27623462677002}, {'id': 564, 'token': ' I', 'bytes': [32, 73], 'logprob': -11.793217658996582}, {'id': 558, 'token': ' T', 'bytes': [32, 84], 'logprob': -12.223130226135254}, {'id': 1366, 'token': ' Q', 'bytes': [32, 81], 'logprob': -12.25825023651123}, {'id': 236799, 'token': 'B', 'bytes': [66], 'logprob': -12.360634803771973}, {'id': 2301, 'token': ' No', 'bytes': [32, 78, 111], 'logprob': -12.547247886657715}, {'id': 730, 'token': ' J', 'bytes': [32, 74], 'logprob': -12.847464561462402}, {'id': 593, 'token': ' P', 'bytes': [32, 80], 'logprob': -12.867361068725586}, {'id': 236764, 'token': ',', 'bytes': [44], 'logprob': -13.022790908813477}, {'id': 637, 'token': ' r', 'bytes': [32, 114], 'logprob': -13.075387954711914}, {'id': 622, 'token': ' D', 'bytes': [32, 68], 'logprob': -13.163289070129395}, {'id': 236776, 'token': 'A', 'bytes': [65], 'logprob': -13.31701374053955}, {'id': 640, 'token': ' H', 'bytes': [32, 72], 'logprob': -13.335040092468262}, {'id': 708, 'token': ' O', 'bytes': [32, 79], 'logprob': -13.52161979675293}]
+Warning: data/typed_decisions_train.jsonl:1018: Option coverage 0.295342 is below 0.5; top tokens: [{'id': 645, 'token': ' E', 'bytes': [32, 69], 'logprob': -0.6983345746994019}, {'id': 603, 'token': ' B', 'bytes': [32, 66], 'logprob': -1.4042805433273315}, {'id': 587, 'token': ' M', 'bytes': [32, 77], 'logprob': -1.5766743421554565}, {'id': 562, 'token': ' A', 'bytes': [32, 65], 'logprob': -2.9998881816864014}, {'id': 646, 'token': ' N', 'bytes': [32, 78], 'logprob': -8.370997428894043}, {'id': 951, 'token': ' no', 'bytes': [32, 110, 111], 'logprob': -9.53917407989502}, {'id': 236788, 'token': 'E', 'bytes': [69], 'logprob': -9.750929832458496}, {'id': 639, 'token': ' L', 'bytes': [32, 76], 'logprob': -9.942824363708496}, {'id': 2301, 'token': ' No', 'bytes': [32, 78, 111], 'logprob': -10.163077354431152}, {'id': 622, 'token': ' D', 'bytes': [32, 68], 'logprob': -10.258063316345215}, {'id': 2303, 'token': ' null', 'bytes': [32, 110, 117, 108, 108], 'logprob': -11.177950859069824}, {'id': 870, 'token': ' [', 'bytes': [32, 91], 'logprob': -11.567730903625488}, {'id': 558, 'token': ' T', 'bytes': [32, 84], 'logprob': -11.70406436920166}, {'id': 753, 'token': ' -', 'bytes': [32, 45], 'logprob': -11.823954582214355}, {'id': 630, 'token': ' R', 'bytes': [32, 82], 'logprob': -11.911343574523926}, {'id': 565, 'token': ' C', 'bytes': [32, 67], 'logprob': -11.936387062072754}, {'id': 236799, 'token': 'B', 'bytes': [66], 'logprob': -12.11011791229248}, {'id': 564, 'token': ' I', 'bytes': [32, 73], 'logprob': -12.128775596618652}, {'id': 7293, 'token': ' none', 'bytes': [32, 110, 111, 110, 101], 'logprob': -12.755739212036133}, {'id': 621, 'token': ' \\', 'bytes': [32, 92], 'logprob': -12.857123374938965}]
+Warning: data/typed_decisions_train.jsonl:1168: Option coverage 0.393181 is below 0.5; top tokens: [{'id': 645, 'token': ' E', 'bytes': [32, 69], 'logprob': -0.5007669925689697}, {'id': 562, 'token': ' A', 'bytes': [32, 65], 'logprob': -1.110515832901001}, {'id': 603, 'token': ' B', 'bytes': [32, 66], 'logprob': -2.7521231174468994}, {'id': 587, 'token': ' M', 'bytes': [32, 77], 'logprob': -7.631357192993164}, {'id': 2301, 'token': ' No', 'bytes': [32, 78, 111], 'logprob': -9.505348205566406}, {'id': 646, 'token': ' N', 'bytes': [32, 78], 'logprob': -10.399890899658203}, {'id': 951, 'token': ' no', 'bytes': [32, 110, 111], 'logprob': -10.42866325378418}, {'id': 236788, 'token': 'E', 'bytes': [69], 'logprob': -10.721931457519531}, {'id': 565, 'token': ' C', 'bytes': [32, 67], 'logprob': -11.14573860168457}, {'id': 558, 'token': ' T', 'bytes': [32, 84], 'logprob': -11.319253921508789}, {'id': 2303, 'token': ' null', 'bytes': [32, 110, 117, 108, 108], 'logprob': -11.88808822631836}, {'id': 639, 'token': ' L', 'bytes': [32, 76], 'logprob': -11.953088760375977}, {'id': 870, 'token': ' [', 'bytes': [32, 91], 'logprob': -12.014350891113281}, {'id': 622, 'token': ' D', 'bytes': [32, 68], 'logprob': -12.23591423034668}, {'id': 621, 'token': ' \\', 'bytes': [32, 92], 'logprob': -12.288236618041992}, {'id': 630, 'token': ' R', 'bytes': [32, 82], 'logprob': -12.301311492919922}, {'id': 633, 'token': ' F', 'bytes': [32, 70], 'logprob': -12.362649917602539}, {'id': 11262, 'token': ' yes', 'bytes': [32, 121, 101, 115], 'logprob': -12.44527816772461}, {'id': 568, 'token': ' (', 'bytes': [32, 40], 'logprob': -12.72424602508545}, {'id': 564, 'token': ' I', 'bytes': [32, 73], 'logprob': -12.75930404663086}]
+Warning: data/typed_decisions_test.jsonl:341: Option coverage 0.338175 is below 0.5; top tokens: [{'id': 645, 'token': ' E', 'bytes': [32, 69], 'logprob': -0.9035194516181946}, {'id': 603, 'token': ' B', 'bytes': [32, 66], 'logprob': -1.1504791975021362}, {'id': 587, 'token': ' M', 'bytes': [32, 77], 'logprob': -1.3626927137374878}, {'id': 562, 'token': ' A', 'bytes': [32, 65], 'logprob': -3.8314483165740967}, {'id': 646, 'token': ' N', 'bytes': [32, 78], 'logprob': -8.16589641571045}, {'id': 236788, 'token': 'E', 'bytes': [69], 'logprob': -9.345952033996582}, {'id': 622, 'token': ' D', 'bytes': [32, 68], 'logprob': -9.527897834777832}, {'id': 951, 'token': ' no', 'bytes': [32, 110, 111], 'logprob': -9.578640937805176}, {'id': 639, 'token': ' L', 'bytes': [32, 76], 'logprob': -9.889782905578613}, {'id': 2301, 'token': ' No', 'bytes': [32, 78, 111], 'logprob': -9.95825481414795}, {'id': 2303, 'token': ' null', 'bytes': [32, 110, 117, 108, 108], 'logprob': -11.361021995544434}, {'id': 236799, 'token': 'B', 'bytes': [66], 'logprob': -11.365145683288574}, {'id': 630, 'token': ' R', 'bytes': [32, 82], 'logprob': -11.511096000671387}, {'id': 558, 'token': ' T', 'bytes': [32, 84], 'logprob': -11.72697925567627}, {'id': 753, 'token': ' -', 'bytes': [32, 45], 'logprob': -12.155806541442871}, {'id': 870, 'token': ' [', 'bytes': [32, 91], 'logprob': -12.16541576385498}, {'id': 565, 'token': ' C', 'bytes': [32, 67], 'logprob': -12.26998233795166}, {'id': 621, 'token': ' \\', 'bytes': [32, 92], 'logprob': -12.407402992248535}, {'id': 7293, 'token': ' none', 'bytes': [32, 110, 111, 110, 101], 'logprob': -12.41834545135498}, {'id': 564, 'token': ' I', 'bytes': [32, 73], 'logprob': -12.598466873168945}]
+Warning: data/typed_decisions_test.jsonl:349: Option coverage 0.425753 is below 0.5; top tokens: [{'id': 645, 'token': ' E', 'bytes': [32, 69], 'logprob': -0.5926627516746521}, {'id': 562, 'token': ' A', 'bytes': [32, 65], 'logprob': -1.0942362546920776}, {'id': 603, 'token': ' B', 'bytes': [32, 66], 'logprob': -2.3973617553710938}, {'id': 587, 'token': ' M', 'bytes': [32, 77], 'logprob': -3.8747329711914062}, {'id': 646, 'token': ' N', 'bytes': [32, 78], 'logprob': -8.606498718261719}, {'id': 2301, 'token': ' No', 'bytes': [32, 78, 111], 'logprob': -9.262344360351562}, {'id': 622, 'token': ' D', 'bytes': [32, 68], 'logprob': -9.921586990356445}, {'id': 951, 'token': ' no', 'bytes': [32, 110, 111], 'logprob': -10.036956787109375}, {'id': 236788, 'token': 'E', 'bytes': [69], 'logprob': -10.036994934082031}, {'id': 639, 'token': ' L', 'bytes': [32, 76], 'logprob': -10.070669174194336}, {'id': 2303, 'token': ' null', 'bytes': [32, 110, 117, 108, 108], 'logprob': -10.50050163269043}, {'id': 565, 'token': ' C', 'bytes': [32, 67], 'logprob': -10.848066329956055}, {'id': 870, 'token': ' [', 'bytes': [32, 91], 'logprob': -11.023675918579102}, {'id': 5450, 'token': ' None', 'bytes': [32, 78, 111, 110, 101], 'logprob': -11.392507553100586}, {'id': 558, 'token': ' T', 'bytes': [32, 84], 'logprob': -11.588716506958008}, {'id': 630, 'token': ' R', 'bytes': [32, 82], 'logprob': -11.770650863647461}, {'id': 7293, 'token': ' none', 'bytes': [32, 110, 111, 110, 101], 'logprob': -11.792057037353516}, {'id': 753, 'token': ' -', 'bytes': [32, 45], 'logprob': -11.808691024780273}, {'id': 568, 'token': ' (', 'bytes': [32, 40], 'logprob': -11.852365493774414}, {'id': 621, 'token': ' \\', 'bytes': [32, 92], 'logprob': -12.108100891113281}]
+Before calibration
+Group                          Count   Accuracy        ECE      Brier   Log loss  Score MAE
+overall                         2000     0.7430     0.1546     0.0742     2.4986     0.4496
+workflow/agent_trace_observability     500     0.6840     0.1561     0.0686     2.2144     0.4212
+workflow/customer_service        500     0.7860     0.1513     0.0684     2.5119     0.2842
+workflow/invoice_processing      500     0.7920     0.1345     0.0578     1.8833     0.5416
+workflow/security_incidents      500     0.7100     0.1857     0.1021     3.3847     0.5515
+type/choice                      600     0.7367     0.1148     0.0510     2.4451          -
+type/noul                        600     0.8233     0.1317     0.0934     1.8627          -
+type/score                       800     0.6875     0.2030     0.0772     3.0156     0.4496
+After calibration
+Group                          Count   Accuracy        ECE      Brier   Log loss  Score MAE
+overall                         2000     0.7430     0.0297     0.0371     1.0480     0.3309
+workflow/agent_trace_observability     500     0.6840     0.0578     0.0284     1.0971     0.3151
+workflow/customer_service        500     0.7860     0.0345     0.0326     0.9986     0.1866
+workflow/invoice_processing      500     0.7920     0.0743     0.0348     0.8360     0.4144
+workflow/security_incidents      500     0.7100     0.0641     0.0528     1.2603     0.4076
+type/choice                      600     0.7367     0.0763     0.0284     1.2001          -
+type/noul                        600     0.8233     0.0297     0.0460     0.6019          -
+type/score                       800     0.6875     0.0440     0.0371     1.2686     0.3309
+Failures: 2
+Latency (ms): mean=1380.03, median=1374.99, p95=1530.66
+Forward passes: total=31044, per case=77.61
+Calls: total=1194, per case=2.98
+Reference accuracies (dataset card, 1,600-case set; not this run):
+  majority baseline: 0.520
+  factor ceiling: 0.704
+  teacher self agreement: 0.735
+  Jev published: 0.727
+  Laya zero shot: 0.360
+  Laya fine tuned: 0.766
+P3_EXIT 0 Sun 20 Sep 19:52:47 CEST 2026
+Group                          Count   Accuracy        ECE      Brier   Log loss  Score MAE
+overall                         2000     0.7370     0.0444     0.0449     4.0999     0.3709
+workflow/agent_trace_observability     500     0.6780     0.0384     0.0416     3.9310     0.3576
+workflow/customer_service        500     0.7940     0.0403     0.0368     3.7109     0.2228
+workflow/invoice_processing      500     0.7680     0.0720     0.0381     2.6335     0.4381
+workflow/security_incidents      500     0.7080     0.0990     0.0630     6.1242     0.4653
+type/choice                      600     0.7200     0.0623     0.0382     2.6993          -
+type/noul                        600     0.8317     0.0346     0.0512     0.6238          -
+type/score                       800     0.6787     0.0818     0.0451     7.7574     0.3709
+Failures: 0
+Latency (ms): mean=507.51, median=510.48, p95=585.11
+Forward passes: total=10400, per case=26.00
+Calls: total=400, per case=1.00
+Reference accuracies (dataset card, 1,600-case set; not this run):
+  majority baseline: 0.520
+  factor ceiling: 0.704
+  teacher self agreement: 0.735
+  Jev published: 0.727
+  Laya zero shot: 0.360
+  Laya fine tuned: 0.766
+P1_EXIT 0 Sun 20 Sep 19:56:11 CEST 2026
+ALL_DONE Sun 20 Sep 19:56:11 CEST 2026
