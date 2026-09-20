@@ -13,7 +13,7 @@ from system1.calibrate import apply_temperature, load_calibration
 from system1.schema import Mode, Noul, QuestionBase, Request, Score, State, options
 
 MODEL = "system1-gemma-4-12b"
-MULTI_FORMAT = 3
+MULTI_FORMAT = 4
 
 
 class LowCoverageError(ValueError):
@@ -307,9 +307,6 @@ class SystemOne:
         usage["calls"] = 0
         for permutation in range(request.permutations):
             order = list(request.questions)
-            random.Random(1000 + permutation).shuffle(order)
-            offset = permutation % len(order)
-            order = order[offset:] + order[:offset]
             groups: list[list[str]] = [[]]
             size = 0
             for name in order:

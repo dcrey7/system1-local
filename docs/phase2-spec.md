@@ -117,8 +117,23 @@ Two findings in `docs/phase2-audit.md` section 9.
 
 Run after the change (Claude): the full multi benchmark with 3 shuffles and fit, then 1 shuffle, and compare with revision 2 in `docs/phase2-results.md`.
 
+## Revision 4 (2026-09-20 21:30 CEST): keep the caller's question order
+
+Measured in `docs/phase2-results.md`, revision 3 section: the reseeded question orders of revision 3 cost 2 points with 3 shuffles (0.743 to 0.723) and 5 points with 1 call (0.737 to 0.687), all of it through question position. `urgency` answered before the other questions loses 9 points; `matches_order` answered after `disposition` loses 27 points. In one call the model reads its own earlier answer lines, so facts must come before judgments and the summary judgment last. The caller knows those dependencies. A random order does not.
+
+Changes, multi mode only:
+
+1. `_multi` uses the caller's order for every permutation: `order = list(request.questions)`. Remove the question shuffle and the rotation (the `random.Random(1000 + permutation)` line and the `offset` rotation of `order`). The option rules stay exactly as they are: choice and noul shuffle their option order per permutation with the per question `random.Random(42)`, score rotates its ids inside its block by the permutation offset. Grouping when the alphabet runs out stays; groups follow the given order.
+2. `MULTI_FORMAT = 4`.
+3. The probability floor from revision 3 stays.
+4. Tests: replace the revision 3 order test with one that checks, on a 5 question FakeBackend request with 3 permutations, that every call's prompt lists the questions in the given order (Q1 is the first question given, Q5 the last) while the option order of a choice question differs between at least two permutations. The multi fingerprint contains `"format": 4`. Single mode fingerprints stay unchanged.
+5. `docs/phase2-notes.md`: add a short revision 4 note.
+
+Run after the change (Claude): the full benchmark, 3 shuffles with fit, then 1 call; compare with revisions 2 and 3 in `docs/phase2-results.md`.
+
 ## Changelog
 
 - 2026-09-20 18:34 CEST: Rewrote the spec for the one call mode on Gemma 4 12B; DiffusionGemma moved to "not chosen".
 - 2026-09-20 19:01 CEST: Revision 2 after the first full run died at case 439: unique ids per call, grouping, format version in the cache key, failing cases counted instead of aborting.
 - 2026-09-20 20:32 CEST: Revision 3: reseeded question order per shuffle, probability floor for ids missing from the top 20 (multi mode only), MULTI_FORMAT 3.
+- 2026-09-20 21:30 CEST: Revision 4: keep the caller's question order, no question shuffle, MULTI_FORMAT 4.

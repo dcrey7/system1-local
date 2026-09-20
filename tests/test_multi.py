@@ -288,7 +288,7 @@ def prompt_blocks(prompt):
     return blocks
 
 
-def test_multi_reseeds_and_rotates_question_order():
+def test_multi_keeps_caller_question_order_and_shuffles_options():
     request = Request(
         state="",
         questions={
@@ -297,21 +297,25 @@ def test_multi_reseeds_and_rotates_question_order():
                 "instructions": f"Question {index}?",
                 "criteria": {"a": None, "b": None},
             }
-            for index in range(5)
+            for index in [3, 1, 4, 0, 2]
         },
+        permutations=3,
     )
     backend = UniformMultiBackend()
     SystemOne(backend).decide(request, calibrated=False, mode="multi")
-    orders = [
-        tuple(instruction for instruction, _ in prompt_blocks(prompt))
-        for prompt in backend.prompts
+    expected_lines = [
+        f"Q{number}: {question.instructions}"
+        for number, question in enumerate(request.questions.values(), start=1)
     ]
-    assert len(orders) == len(set(orders)) == 3
-    assert len({order[0] for order in orders}) == 3
-    assert orders == [
-        tuple(f"Question {index}?" for index in order)
-        for order in ([4, 2, 1, 0, 3], [3, 4, 1, 0, 2], [0, 3, 4, 1, 2])
-    ]
+    assert len(backend.prompts) == 3
+    for prompt in backend.prompts:
+        assert [
+            line for line in prompt.splitlines() if re.match(r"Q\d+: ", line)
+        ] == expected_lines
+    option_orders = {
+        tuple(prompt_blocks(prompt)[0][1].values()) for prompt in backend.prompts
+    }
+    assert len(option_orders) > 1
 
 
 def test_multi_unique_blocks_and_score_rotation():
@@ -388,11 +392,14 @@ def test_multi_groups_questions_in_prompt_order(permutations):
         ids = [token for _, assigned in blocks for token in assigned]
         assert len(ids) == len(set(ids)) <= 6
         assert set(ids) == set(backend.alphabet[: len(ids)])
-    assert [name for name, _ in prompt_blocks(backend.prompts[0])] == [
-        "Is this statement true? Third?",
-        "First?",
-    ]
-    assert [name for name, _ in prompt_blocks(backend.prompts[1])] == ["Second?"]
+    for index in range(permutations):
+        assert [name for name, _ in prompt_blocks(backend.prompts[2 * index])] == [
+            "First?",
+            "Second?",
+        ]
+        assert [name for name, _ in prompt_blocks(backend.prompts[2 * index + 1])] == [
+            "Is this statement true? Third?"
+        ]
     assert set(result["answers"]) == set(request.questions)
 
 

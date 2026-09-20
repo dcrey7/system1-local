@@ -112,6 +112,15 @@ still stop the run. No live server or benchmark was run.
 
 ## Changelog
 
+- 2026-09-20 21:31 CEST: Implemented Revision 4. Multi mode keeps the caller's
+  question order in every permutation and across groups. Choice and noul option
+  shuffles, score id rotation, and the probability floor remain unchanged.
+  Set `MULTI_FORMAT = 4` to invalidate earlier multi caches. Single mode cache
+  fingerprints remain unchanged. Added tests for fixed question order, varied
+  choice option order, grouping order, and rejection of revision 3 cache entries.
+  Validation with `UV_CACHE_DIR=/tmp/system1-uv-cache`: `uv run ruff check .`
+  reported `All checks passed!`; `uv run pytest -q` reported
+  `129 passed, 1 skipped in 0.78s`. No server was started or stopped.
 - 2026-09-20 18:49 CEST: Restored phase 1 cache fingerprints for single mode by
   omitting `mode`. Multi fingerprints keep `"mode": "multi"`. Added two regression tests.
   Validation: format and lint passed; `110 passed in 0.69s`.
