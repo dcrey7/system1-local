@@ -9,10 +9,10 @@ from typer.testing import CliRunner
 
 from system1.api import create_app
 from system1.backend import FakeBackend
-from system1.bench import benchmark, report_table, run_cases
+from system1.bench import benchmark, report_table, run_cases, summarize
 from system1.calibrate import load_calibration, save_calibration
 from system1.cli import app
-from system1.core import MODEL, SystemOne
+from system1.core import MODEL, LowCoverageError, SystemOne
 from system1.schema import Request
 
 
@@ -66,17 +66,17 @@ def test_multi_fit_and_default_cache_leave_single_calibration_untouched(tmp_path
     )
     assert (tmp_path / "data/preds_train_multi.jsonl").exists()
     assert not (tmp_path / "data/preds_train.jsonl").exists()
-    assert len(backend.prompts) == 2
+    assert len(backend.prompts) == 6
     assert report["overall"]["ece"] < report["before_calibration"]["overall"]["ece"]
-    assert report["calls"] == {"total": 1, "per_case": 1.0}
+    assert report["calls"] == {"total": 3, "per_case": 3.0}
     assert report["forward_passes"] == {"total": 12, "per_case": 12.0}
     assert report["latency_ms"]["mean"] == report["cases"][0]["latency_ms"]
     table = report_table(report)
-    assert "Calls: total=1, per case=1.00" in table
+    assert "Calls: total=3, per case=3.00" in table
     assert "Latency (ms): mean=" in table
     assert "type/noul" in table
     benchmark(path, engine, permutations=1, train=path, mode="multi")
-    assert len(backend.prompts) == 3
+    assert len(backend.prompts) == 9
 
 
 def test_shared_cache_separates_modes_and_permutations(tmp_path):
@@ -87,11 +87,11 @@ def test_shared_cache_separates_modes_and_permutations(tmp_path):
     run_cases(path, engine, 1, cache_path=cache)
     assert len(backend.prompts) == 3
     run_cases(path, engine, 1, cache_path=cache, mode="multi")
-    assert len(backend.prompts) == 4
-    run_cases(path, engine, 1, cache_path=cache, mode="multi")
-    assert len(backend.prompts) == 4
-    run_cases(path, engine, 2, cache_path=cache, mode="multi")
     assert len(backend.prompts) == 6
+    run_cases(path, engine, 1, cache_path=cache, mode="multi")
+    assert len(backend.prompts) == 6
+    run_cases(path, engine, 2, cache_path=cache, mode="multi")
+    assert len(backend.prompts) == 12
     assert len(cache.read_text().splitlines()) == 3
 
 
@@ -140,7 +140,9 @@ def test_multi_cache_fingerprint_differs_from_phase1(tmp_path):
     )
     assert (
         entry["fingerprint"]
-        == hashlib.sha256(json.dumps({**phase1, "mode": "multi"}).encode()).hexdigest()
+        == hashlib.sha256(
+            json.dumps({**phase1, "mode": "multi", "format": 2}).encode()
+        ).hexdigest()
     )
 
 
@@ -152,6 +154,113 @@ def test_custom_multi_calibration_path(tmp_path):
     assert path.exists()
     assert not (tmp_path / "calibration.json").exists()
     assert not (tmp_path / "calibration_multi.json").exists()
+
+
+def test_multi_format_invalidates_old_cache(tmp_path):
+    path = cases_file(tmp_path / "cases.jsonl")
+    cache = tmp_path / "cache.jsonl"
+    old_data = {
+        "version": 1,
+        "model": MODEL,
+        "case": json.loads(path.read_text()),
+        "permutations": 1,
+        "mode": "multi",
+    }
+    cache.write_text(
+        json.dumps(
+            {
+                "fingerprint": hashlib.sha256(
+                    json.dumps(old_data).encode()
+                ).hexdigest(),
+                "result": {},
+            }
+        )
+        + "\n"
+    )
+    backend = fake_backend()
+    run_cases(path, SystemOne(backend), 1, cache_path=cache, mode="multi")
+    assert len(backend.prompts) == 3
+    assert len(cache.read_text().splitlines()) == 2
+
+
+@pytest.mark.parametrize("mode", ["single", "multi"])
+def test_low_coverage_case_is_uniform_and_run_continues(tmp_path, capsys, mode):
+    path = cases_file(tmp_path / "cases.jsonl")
+    case = json.loads(path.read_text())
+    case["state"] = "bad"
+    case["questions"]["route"]["criteria"]["sales"] = None
+    good = {**case, "id": "2", "state": "good"}
+    path.write_text("\n" + json.dumps(case) + "\n\n" + json.dumps(good) + "\n")
+
+    class FailingBackend(FakeBackend):
+        def complete(self, prompt):
+            if "State:\nbad\n" in prompt:
+                raise LowCoverageError("missing mass\nanswer token")
+            return super().complete(prompt)
+
+        def complete_multi(self, prompt, grammar, max_tokens):
+            if "State:\nbad\n" in prompt:
+                raise LowCoverageError("missing mass\nanswer token")
+            return super().complete_multi(prompt, grammar, max_tokens)
+
+    backend = FailingBackend(
+        responses=[
+            [
+                {"token": "A", "logprob": math.log(0.8)},
+                {"token": "B", "logprob": math.log(0.2)},
+            ]
+        ]
+        * 3,
+        alphabet="ABC",
+        multi_responses={"Q1": {"A": 0.8, "B": 0.2}},
+    )
+    engine = SystemOne(backend)
+    cache = tmp_path / "cache.jsonl"
+    records, usages = run_cases(path, engine, 1, cache_path=cache, mode=mode)
+    report = summarize(records, usages)
+    assert report["failures"] == {"count": 1, "lines": [2]}
+    assert report["decisions"] == 2
+    assert report["overall"]["count"] == 6
+    assert "Failures: 1" in report_table(report)
+    assert [record["id"] for record in records] == ["1"] * 3 + ["2"] * 3
+    for record in records[:3]:
+        size = len(record["options"])
+        assert record["probabilities"] == [1 / size] * size
+    assert records[3]["probabilities"] != [1 / 3] * 3
+    assert len(cache.read_text().splitlines()) == 1
+    assert capsys.readouterr().err.splitlines() == [
+        f"Warning: {path}:2: missing mass answer token"
+    ]
+    limited, usages = run_cases(path, engine, 1, limit=1, mode=mode)
+    assert len(limited) == 3
+    assert summarize(limited, usages)["failures"] == {"count": 1, "lines": [2]}
+
+
+@pytest.mark.parametrize("mode", ["single", "multi"])
+@pytest.mark.parametrize(
+    "error", [httpx.HTTPError("server error"), RuntimeError("probe error")]
+)
+def test_benchmark_server_errors_still_abort(tmp_path, monkeypatch, mode, error):
+    path = cases_file(tmp_path / "cases.jsonl")
+    backend = fake_backend()
+
+    def fail(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(
+        backend, "complete" if mode == "single" else "complete_multi", fail
+    )
+    with pytest.raises(type(error), match=str(error)):
+        run_cases(path, SystemOne(backend), 1, mode=mode)
+
+
+def test_summarize_accepts_cached_usage_without_calls(tmp_path):
+    path = cases_file(tmp_path / "cases.jsonl")
+    records, usages = run_cases(path, SystemOne(fake_backend()), 1)
+    del usages[0]["calls"]
+    report = summarize(records, usages)
+    assert report["calls"] == report["forward_passes"] == {"total": 3, "per_case": 3.0}
+    assert report["failures"] == {"count": 0, "lines": []}
 
 
 def test_cli_multi_ask_and_bench(monkeypatch, tmp_path):
@@ -176,8 +285,8 @@ def test_cli_multi_ask_and_bench(monkeypatch, tmp_path):
         ],
     )
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output)["usage"]["calls"] == 1
-    assert len(backend.prompts) == 1
+    assert json.loads(result.output)["usage"]["calls"] == 2
+    assert len(backend.prompts) == 2
     path = cases_file(tmp_path / "cases.jsonl")
     out = tmp_path / "report.json"
     result = runner.invoke(
@@ -196,8 +305,8 @@ def test_cli_multi_ask_and_bench(monkeypatch, tmp_path):
         ],
     )
     assert result.exit_code == 0, result.output
-    assert json.loads(out.read_text())["calls"] == {"total": 1, "per_case": 1.0}
-    assert len(backend.prompts) == 3
+    assert json.loads(out.read_text())["calls"] == {"total": 3, "per_case": 3.0}
+    assert len(backend.prompts) == 8
     assert (tmp_path / "calibration_multi.json").exists()
 
 

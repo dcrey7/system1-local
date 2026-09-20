@@ -2,8 +2,10 @@
 
 import hashlib
 import json
+import sys
 from collections import defaultdict
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 
@@ -17,7 +19,7 @@ from system1.calibrate import (
     soft_log_loss,
     soft_targets,
 )
-from system1.core import MODEL, SystemOne
+from system1.core import MODEL, MULTI_FORMAT, LowCoverageError, SystemOne
 from system1.schema import Mode, Request, options
 
 REFERENCES = {
@@ -98,6 +100,7 @@ def run_cases(
     for line_number, line in enumerate(path.read_text().splitlines(), 1):
         if not line.strip():
             continue
+        start = perf_counter()
         try:
             case = json.loads(line)
             if workflow is not None and case["workflow"] != workflow:
@@ -117,6 +120,7 @@ def run_cases(
             }
             if mode == "multi":
                 fingerprint_data["mode"] = mode
+                fingerprint_data["format"] = MULTI_FORMAT
             fingerprint = hashlib.sha256(
                 json.dumps(fingerprint_data).encode()
             ).hexdigest()
@@ -143,6 +147,23 @@ def run_cases(
                     else [answer["probabilities"][label] for label in record["options"]]
                 )
                 records.append(record)
+        except LowCoverageError as error:
+            message = " ".join(str(error).splitlines())
+            print(f"Warning: {path}:{line_number}: {message}", file=sys.stderr)
+            for record in targets:
+                size = len(record["options"])
+                records.append({**record, "probabilities": [1 / size] * size})
+            # Failed decisions do not return token or call counts.
+            usages.append(
+                {
+                    "id": case["id"],
+                    "input_tokens": 0,
+                    "forward_passes": 0,
+                    "calls": 0,
+                    "latency_ms": (perf_counter() - start) * 1000,
+                    "failure_line": line_number,
+                }
+            )
         except (ValueError, KeyError, TypeError) as error:
             raise ValueError(f"{path}:{line_number}: {error}") from error
         if limit is not None and len(usages) >= limit:
@@ -177,10 +198,12 @@ def metrics(records: list[dict]) -> dict:
 def summarize(records: list[dict], usages: list[dict]) -> dict:
     latencies = [usage["latency_ms"] for usage in usages]
     passes = [usage["forward_passes"] for usage in usages]
-    calls = [usage["calls"] for usage in usages]
+    calls = [usage.get("calls", usage["forward_passes"]) for usage in usages]
+    failures = [usage["failure_line"] for usage in usages if "failure_line" in usage]
     report = {
         "overall": metrics(records),
         "decisions": len(usages),
+        "failures": {"count": len(failures), "lines": failures},
         "latency_ms": {
             "mean": float(np.mean(latencies)),
             "median": float(np.median(latencies)),
@@ -283,6 +306,7 @@ def report_table(report: dict) -> str:
             ]
         )
     lines.extend(metric_table(report))
+    lines.append(f"Failures: {report['failures']['count']}")
     lines.append(
         f"Latency (ms): mean={report['latency_ms']['mean']:.2f}, median={report['latency_ms']['median']:.2f}, p95={report['latency_ms']['p95']:.2f}"
     )

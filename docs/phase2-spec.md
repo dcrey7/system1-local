@@ -93,6 +93,21 @@ Report next to phase 1: accuracy, ECE before and after temperature, soft Brier, 
 
 It exists in one size only (26B A4B, 9 Jun 2026). It would give a true single forward pass for all answers and 3.8B active weights, but its int4 weights take 17.2 GB and its KV cache 40 KB per token, so 262k does not fit on the 24 GB card, and it needs a second runtime (vLLM 0.29.0 or transformers 5.17.0). The one call mode above gives the same interface on the model we already run. Weights are on disk at `/home/abhishek/models/diffusiongemma-awq-int4/weights` if we ever return to it.
 
+## Revision 2 (2026-09-20 19:01 CEST): unique ids per call, and a benchmark that does not die
+
+First full run died at training case 439 (`customer_service`): a two option noul (`needs_human`, ids A and B) sat between five and four option questions, and the raw distribution at its answer token put 0.71 on ` C`, a letter that belongs to a neighbour question. Coverage on its own ids was 0.29, so `read_probabilities` raised and the whole 40 minute run aborted. Every case in this benchmark mixes option counts. No case needs more than 20 ids in total, the alphabet has 36.
+
+Changes, all in multi mode unless stated:
+
+1. **Unique ids across the call.** Assign ids from `backend.alphabet` consecutively in prompt order: Q1 takes the first n1 ids, Q2 the next n2, and so on, so one letter means one question. Choice and noul: shuffle the option order inside the question's own block per permutation (same seeded rules as today). Score: keep the level order and rotate the ids inside the block by the permutation offset (today's rotation, now block local). The grammar lists each line's own ids as before.
+2. **Grouping when the alphabet is too small.** If the total number of options exceeds `len(alphabet)`, split the questions (in prompt order) into the fewest groups that each fit, one call per group per permutation. `usage["calls"]` counts every call. Remove the current "use single mode for larger questions" error, except for a single question whose options alone exceed the alphabet: that still raises the same error as today.
+3. **Format version in the cache key.** Add `MULTI_FORMAT = 2` in `core.py` and put `"format": MULTI_FORMAT` in the multi fingerprint in `bench.run_cases`, so a prompt format change can never reuse stale cached predictions. Single mode fingerprints stay byte for byte as phase 1.
+4. **A failing case must not abort the benchmark (both modes).** In `run_cases`, catch `LowCoverageError` per case: print one warning line to stderr with the file, line number and the message, give every decision of that case a uniform distribution over its options (so it counts as maximally unsure and usually wrong), add the case to `report["failures"] = {"count": n, "lines": [...]}`, and continue. `summarize` and `report_table` show the failure count. Server errors (`httpx.HTTPError`, `RuntimeError` from the probe) still abort.
+5. **Old cached usages.** `summarize` must accept usages without a `calls` key: `usage.get("calls", usage["forward_passes"])`.
+
+Tests to add: unique id blocks across three questions (2, 5, 4 options); score rotation stays inside its block; grouping with a 6 letter fake alphabet and questions of 3, 3, 2 options gives two calls; the multi fingerprint contains `"format": 2` and the single one has no format key; a FakeBackend that raises `LowCoverageError` on one case yields uniform records, a failure count of 1, and the run continues; `summarize` on a usage without `calls`.
+
 ## Changelog
 
 - 2026-09-20 18:34 CEST: Rewrote the spec for the one call mode on Gemma 4 12B; DiffusionGemma moved to "not chosen".
+- 2026-09-20 19:01 CEST: Revision 2 after the first full run died at case 439: unique ids per call, grouping, format version in the cache key, failing cases counted instead of aborting.

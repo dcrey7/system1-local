@@ -1,5 +1,6 @@
 import json
 import math
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -183,17 +184,18 @@ def test_multi_matches_single_and_averages_permutations(tmp_path, calibrated):
     second = SystemOne(multi).decide(request, calibrated=calibrated, mode="multi")
     assert first["answers"] == second["answers"]
     assert first["usage"]["calls"] == first["usage"]["forward_passes"] == 9
-    assert second["usage"]["calls"] == 3
+    assert second["usage"]["calls"] == 9
     assert second["usage"]["forward_passes"] == 36
-    assert second["usage"]["input_tokens"] == 30
-    assert multi.max_tokens == [32, 32, 32]
-    assert len(set(multi.prompts)) == 3
+    assert second["usage"]["input_tokens"] == 90
+    assert multi.max_tokens == [16] * 9
+    assert len(set(multi.prompts)) == 6
     first_questions = [
         next(line for line in prompt.splitlines() if line.startswith("Q1:"))
         for prompt in multi.prompts
     ]
     assert len(set(first_questions)) > 1
-    for index, prompt in enumerate(multi.prompts):
+    score_prompts = [prompt for prompt in multi.prompts if "Q1: Risk?" in prompt]
+    for index, prompt in enumerate(score_prompts):
         assert (
             "  A. low\n  B. high" if index % 2 == 0 else "  B. low\n  A. high"
         ) in prompt
@@ -227,6 +229,112 @@ def test_multi_rejects_large_question_before_completion():
             mode="multi",
         )
     assert backend.prompts == []
+
+
+class UniformMultiBackend(FakeBackend):
+    def complete_multi(self, prompt, grammar, max_tokens):
+        self.multi_responses = {}
+        for number, alternatives in re.findall(
+            r'^q\d+ ::= "(Q\d+): " \((.*?)\)', grammar, re.M
+        ):
+            ids = re.findall(r'"([A-Za-z0-9])"', alternatives)
+            self.multi_responses[number] = dict.fromkeys(ids, 1 / len(ids))
+        return super().complete_multi(prompt, grammar, max_tokens)
+
+
+def prompt_blocks(prompt):
+    blocks = []
+    for line in prompt.splitlines():
+        if re.match(r"Q\d+: ", line):
+            blocks.append((line.split(": ", 1)[1], {}))
+        elif line.startswith("  "):
+            token, label = line.strip().split(". ", 1)
+            blocks[-1][1][token] = label
+    return blocks
+
+
+def test_multi_unique_blocks_and_score_rotation():
+    backend = UniformMultiBackend(alphabet="ABCDEFGHIJK")
+    request = Request(
+        state="",
+        permutations=6,
+        questions={
+            "truth": {"type": "noul", "instructions": "True?"},
+            "route": {
+                "type": "choice",
+                "instructions": "Team?",
+                "criteria": dict.fromkeys(["one", "two", "three", "four", "five"]),
+            },
+            "risk": {
+                "type": "score",
+                "instructions": "Risk?",
+                "levels": ["low", "medium", "high", "urgent"],
+            },
+        },
+    )
+    result = SystemOne(backend).decide(request, calibrated=False, mode="multi")
+    assert result["usage"]["calls"] == 6
+    for permutation, (prompt, grammar) in enumerate(
+        zip(backend.prompts, backend.grammars)
+    ):
+        start = 0
+        blocks = prompt_blocks(prompt)
+        assert sorted(len(assigned) for _, assigned in blocks) == [2, 4, 5]
+        for instruction, assigned in blocks:
+            block = backend.alphabet[start : start + len(assigned)]
+            assert set(assigned) == set(block)
+            if instruction == "Risk?":
+                offset = permutation % 4
+                assert list(assigned) == list(block[offset:] + block[:offset])
+                assert list(assigned.values()) == ["low", "medium", "high", "urgent"]
+            else:
+                assert list(assigned) == list(block)
+            start += len(assigned)
+        assert start == 11
+        assert grammar == build_grammar([list(assigned) for _, assigned in blocks])
+    assert len(set(backend.prompts)) > 1
+    assert result["answers"]["risk"]["expected_index"] == pytest.approx(1.5)
+    assert result["answers"]["truth"]["noul"] == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("permutations", [1, 3])
+def test_multi_groups_questions_in_prompt_order(permutations):
+    backend = UniformMultiBackend(alphabet="ABCDEF")
+    request = Request(
+        state="",
+        permutations=permutations,
+        questions={
+            "first": {
+                "type": "score",
+                "instructions": "First?",
+                "levels": ["a", "b", "c"],
+            },
+            "second": {
+                "type": "score",
+                "instructions": "Second?",
+                "levels": ["a", "b", "c"],
+            },
+            "third": {"type": "noul", "instructions": "Third?"},
+        },
+    )
+    result = SystemOne(backend).decide(request, calibrated=False, mode="multi")
+    assert len(backend.prompts) == result["usage"]["calls"] == 2 * permutations
+    assert result["usage"]["forward_passes"] == 12 * permutations
+    assert result["usage"]["input_tokens"] == 20 * permutations
+    assert backend.max_tokens == [24, 16] * permutations
+    for prompt in backend.prompts:
+        blocks = prompt_blocks(prompt)
+        ids = [token for _, assigned in blocks for token in assigned]
+        assert len(ids) == len(set(ids)) <= 6
+        assert set(ids) == set(backend.alphabet[: len(ids)])
+    assert [name for name, _ in prompt_blocks(backend.prompts[0])] == [
+        "Second?",
+        "First?",
+    ]
+    assert [name for name, _ in prompt_blocks(backend.prompts[1])] == [
+        "Is this statement true? Third?"
+    ]
+    assert set(result["answers"]) == set(request.questions)
 
 
 def mock_backend(handle):

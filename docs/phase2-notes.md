@@ -99,8 +99,20 @@ Validation results recorded at the time above:
 All tests use fake responses or in-process HTTP transports. The network guard
 remains active. No server was started or stopped. No commit was made.
 
+Revision 2 validation, 2026-09-20 19:05 CEST: `uv run ruff format .`,
+`uv run ruff check .`, and `uv run pytest -q` passed with
+`UV_CACHE_DIR=/tmp/system1-uv-cache`. Pytest reported `121 passed in 0.75s`.
+The single mode tests and cache fingerprint check pass unchanged.
+
+Low coverage failures produce uniform records and a warning with the source
+line number. Reports count these failed cases, and failed predictions are not
+cached. Failed decisions return no usage counters, so their call and token
+counts are recorded as zero; their elapsed time is recorded. Server errors
+still stop the run. No live server or benchmark was run.
+
 ## Changelog
 
 - 2026-09-20 18:49 CEST: Restored phase 1 cache fingerprints for single mode by
   omitting `mode`. Multi fingerprints keep `"mode": "multi"`. Added two regression tests.
   Validation: format and lint passed; `110 passed in 0.69s`.
+- 2026-09-20 19:05 CEST: Multi calls assign consecutive, separate id blocks in prompt order and start a new call when the next question does not fit the alphabet. Choice and noul options shuffle within their blocks, while score labels keep their order and their ids rotate only within their own block.

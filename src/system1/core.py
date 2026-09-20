@@ -13,6 +13,7 @@ from system1.calibrate import apply_temperature, load_calibration
 from system1.schema import Mode, Noul, QuestionBase, Request, Score, State, options
 
 MODEL = "system1-gemma-4-12b"
+MULTI_FORMAT = 2
 
 
 class LowCoverageError(ValueError):
@@ -279,9 +280,7 @@ class SystemOne:
             "answers": answers,
             "usage": {
                 **usage,
-                "calls": request.permutations
-                if mode == "multi"
-                else usage["forward_passes"],
+                "calls": usage["calls"] if mode == "multi" else usage["forward_passes"],
                 "latency_ms": (perf_counter() - start) * 1000,
             },
         }
@@ -289,7 +288,7 @@ class SystemOne:
     def _multi(
         self, request: Request, alphabet: str, usage: dict[str, int]
     ) -> tuple[dict[str, dict[str, float]], dict[str, list[float]]]:
-        """Average one complete answer stream per permutation."""
+        """Average grouped answer streams with unique ids per call."""
         labels = {name: list(options(q)) for name, q in request.questions.items()}
         if any(len(values) > len(alphabet) for values in labels.values()):
             raise ValueError(
@@ -301,37 +300,52 @@ class SystemOne:
         question_rng = random.Random(42)
         option_rngs = {name: random.Random(42) for name in labels}
         previous: dict[str, list[str]] = {}
+        usage["calls"] = 0
         for permutation in range(request.permutations):
             order = list(request.questions)
             question_rng.shuffle(order)
-            assigned = {}
-            for name, question in request.questions.items():
-                ids = alphabet
-                if isinstance(question, Score):
-                    option_order = labels[name].copy()
-                    offset = permutation % len(alphabet)
-                    ids = alphabet[offset:] + alphabet[:offset]
-                else:
-                    option_order = sorted(labels[name])
-                    option_rngs[name].shuffle(option_order)
-                    if option_order == previous.get(name) and len(option_order) > 1:
-                        option_order = option_order[1:] + option_order[:1]
-                previous[name] = option_order
-                assigned[name] = dict(zip(ids, option_order))
-            ids_per_question = [list(assigned[name]) for name in order]
-            tokens, count = self.backend.complete_multi(
-                build_multi_prompt(request.state, request.questions, assigned, order),
-                build_grammar(ids_per_question),
-                max_tokens=8 * len(order) + 8,
-            )
-            usage["input_tokens"] += count
-            usage["forward_passes"] += len(tokens)
-            for name, (values, coverage) in zip(
-                order, read_multi(tokens, ids_per_question)
-            ):
-                coverages[name].append(coverage)
-                for label, probability in zip(assigned[name].values(), values):
-                    totals[name][label] += probability / request.permutations
+            groups: list[list[str]] = [[]]
+            size = 0
+            for name in order:
+                if size + len(labels[name]) > len(alphabet):
+                    groups.append([])
+                    size = 0
+                groups[-1].append(name)
+                size += len(labels[name])
+            for group in groups:
+                assigned = {}
+                start = 0
+                for name in group:
+                    ids = alphabet[start : start + len(labels[name])]
+                    start += len(labels[name])
+                    if isinstance(request.questions[name], Score):
+                        option_order = labels[name].copy()
+                        offset = permutation % len(ids)
+                        ids = ids[offset:] + ids[:offset]
+                    else:
+                        option_order = sorted(labels[name])
+                        option_rngs[name].shuffle(option_order)
+                        if option_order == previous.get(name) and len(option_order) > 1:
+                            option_order = option_order[1:] + option_order[:1]
+                    previous[name] = option_order
+                    assigned[name] = dict(zip(ids, option_order))
+                ids_per_question = [list(assigned[name]) for name in group]
+                tokens, count = self.backend.complete_multi(
+                    build_multi_prompt(
+                        request.state, request.questions, assigned, group
+                    ),
+                    build_grammar(ids_per_question),
+                    max_tokens=8 * len(group) + 8,
+                )
+                usage["calls"] += 1
+                usage["input_tokens"] += count
+                usage["forward_passes"] += len(tokens)
+                for name, (values, coverage) in zip(
+                    group, read_multi(tokens, ids_per_question)
+                ):
+                    coverages[name].append(coverage)
+                    for label, probability in zip(assigned[name].values(), values):
+                        totals[name][label] += probability / request.permutations
         return totals, coverages
 
 
