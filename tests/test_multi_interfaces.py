@@ -145,7 +145,7 @@ def test_multi_cache_fingerprint_differs_from_phase1(tmp_path):
     assert (
         entry["fingerprint"]
         == hashlib.sha256(
-            json.dumps({**phase1, "mode": "multi", "format": 2}).encode()
+            json.dumps({**phase1, "mode": "multi", "format": 3}).encode()
         ).hexdigest()
     )
 
@@ -160,7 +160,8 @@ def test_custom_multi_calibration_path(tmp_path):
     assert not (tmp_path / "calibration_multi.json").exists()
 
 
-def test_multi_format_invalidates_old_cache(tmp_path):
+@pytest.mark.parametrize("old_format", [None, 2])
+def test_multi_format_invalidates_old_cache(tmp_path, old_format):
     path = cases_file(tmp_path / "cases.jsonl")
     cache = tmp_path / "cache.jsonl"
     old_data = {
@@ -170,6 +171,8 @@ def test_multi_format_invalidates_old_cache(tmp_path):
         "permutations": 1,
         "mode": "multi",
     }
+    if old_format is not None:
+        old_data["format"] = old_format
     cache.write_text(
         json.dumps(
             {

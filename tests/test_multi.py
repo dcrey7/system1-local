@@ -14,6 +14,7 @@ from system1.core import (
     build_grammar,
     build_multi_prompt,
     read_multi,
+    read_probabilities,
     system_one,
 )
 from system1.schema import Choice, Noul, Request
@@ -89,7 +90,7 @@ def test_read_multi_fake_stream():
         "\n",
     ]
     results = read_multi(stream, [list("ABC"), list("DE")])
-    assert results[0][0] == pytest.approx([0.2, 0, 0.8])
+    assert results[0][0] == pytest.approx([0.2 / 1.01, 0.01 / 1.01, 0.8 / 1.01])
     assert results[1][0] == pytest.approx([0.7, 0.3])
     assert [coverage for _, coverage in results] == pytest.approx([1, 1])
     assert count == 10
@@ -105,8 +106,42 @@ def test_read_multi_split_prefix_and_id_whitespace(prefix, answer):
     if not answer.endswith("\n"):
         stream.append(generated("\n"))
     values, coverage = read_multi(stream, [list("ABC")])[0]
-    assert values == pytest.approx([0.25, 0, 0.75])
+    assert values == pytest.approx([0.2 / 0.81, 0.01 / 0.81, 0.6 / 0.81])
     assert coverage == pytest.approx(0.8)
+
+
+@pytest.mark.parametrize("last_mass,expected_floor", [(0.004, 0.004), (0.02, 0.01)])
+def test_probability_floor_uses_last_token_and_keeps_real_coverage(
+    last_mass, expected_floor
+):
+    distribution = {" A": 0.6, **{f"other{i}": 0.02 for i in range(18)}}
+    distribution["last"] = last_mass
+    tokens = top_tokens(distribution)
+    assert len(tokens) == 20
+    values, coverage = read_probabilities(tokens, list("ABC"), floor=True)
+    total = 0.6 + 2 * expected_floor
+    assert values == pytest.approx(
+        [0.6 / total, expected_floor / total, expected_floor / total]
+    )
+    assert coverage == pytest.approx(0.6)
+    assert read_probabilities(tokens, list("ABC")) == ([1.0, 0.0, 0.0], coverage)
+    assert read_probabilities(tokens, list("ABC"), floor=False) == (
+        [1.0, 0.0, 0.0],
+        coverage,
+    )
+
+
+def test_probability_floor_preserves_small_positive_mass():
+    tokens = top_tokens({"A": 0.6, "B": 0.001, "other": 0.0005})
+    values, coverage = read_probabilities(tokens, list("ABC"), floor=True)
+    assert values == pytest.approx([0.6 / 0.6015, 0.001 / 0.6015, 0.0005 / 0.6015])
+    assert coverage == pytest.approx(0.601)
+
+
+@pytest.mark.parametrize("distribution", [{}, {"other": 0.51, "A": 0.49}])
+def test_probability_floor_does_not_rescue_low_coverage(distribution):
+    with pytest.raises(LowCoverageError, match="coverage"):
+        read_probabilities(top_tokens(distribution), list("ABC"), floor=True)
 
 
 @pytest.mark.parametrize("answer", [": C", "Q1: C", " C\nQ2: A"])
@@ -253,6 +288,32 @@ def prompt_blocks(prompt):
     return blocks
 
 
+def test_multi_reseeds_and_rotates_question_order():
+    request = Request(
+        state="",
+        questions={
+            f"q{index}": {
+                "type": "choice",
+                "instructions": f"Question {index}?",
+                "criteria": {"a": None, "b": None},
+            }
+            for index in range(5)
+        },
+    )
+    backend = UniformMultiBackend()
+    SystemOne(backend).decide(request, calibrated=False, mode="multi")
+    orders = [
+        tuple(instruction for instruction, _ in prompt_blocks(prompt))
+        for prompt in backend.prompts
+    ]
+    assert len(orders) == len(set(orders)) == 3
+    assert len({order[0] for order in orders}) == 3
+    assert orders == [
+        tuple(f"Question {index}?" for index in order)
+        for order in ([4, 2, 1, 0, 3], [3, 4, 1, 0, 2], [0, 3, 4, 1, 2])
+    ]
+
+
 def test_multi_unique_blocks_and_score_rotation():
     backend = UniformMultiBackend(alphabet="ABCDEFGHIJK")
     request = Request(
@@ -328,12 +389,10 @@ def test_multi_groups_questions_in_prompt_order(permutations):
         assert len(ids) == len(set(ids)) <= 6
         assert set(ids) == set(backend.alphabet[: len(ids)])
     assert [name for name, _ in prompt_blocks(backend.prompts[0])] == [
-        "Second?",
+        "Is this statement true? Third?",
         "First?",
     ]
-    assert [name for name, _ in prompt_blocks(backend.prompts[1])] == [
-        "Is this statement true? Third?"
-    ]
+    assert [name for name, _ in prompt_blocks(backend.prompts[1])] == ["Second?"]
     assert set(result["answers"]) == set(request.questions)
 
 

@@ -107,7 +107,18 @@ Changes, all in multi mode unless stated:
 
 Tests to add: unique id blocks across three questions (2, 5, 4 options); score rotation stays inside its block; grouping with a 6 letter fake alphabet and questions of 3, 3, 2 options gives two calls; the multi fingerprint contains `"format": 2` and the single one has no format key; a FakeBackend that raises `LowCoverageError` on one case yields uniform records, a failure count of 1, and the run continues; `summarize` on a usage without `calls`.
 
+## Revision 3 (2026-09-20 20:32 CEST): reseeded shuffles and a probability floor, from the audit
+
+Two findings in `docs/phase2-audit.md` section 9.
+
+1. **Reseed the question order per shuffle.** Today `_multi` uses `random.Random(42)` once, and the three default shuffles put the same question first (orders `[3,1,2,4,0]`, `[3,2,0,4,1]`, `[3,1,2,0,4]`). Change: for permutation `k` build the question order with `random.Random(1000 + k)` and, after the shuffle, rotate the list so that the question at position `k mod n` comes first. Option orders keep their current rules. Add a test that for a 5 question request the first question differs across the three default permutations, and that permutations 0, 1, 2 give three different orders.
+2. **Floor for options missing from the top 20.** The server returns 20 tokens. A valid option id absent from that list gets probability zero today, which is why the one shuffle run has 288 zero entries and a soft log loss of 4.1. Change `read_probabilities(top_tokens, ids, floor=False)`: when `floor` is true, every id that received no mass gets the probability of the last (smallest) returned token, capped at 0.01, before normalisation; coverage is still computed from the real mass only. Multi mode calls it with `floor=True`; single mode keeps `floor=False` so phase 1 stays byte for byte. Test: an id missing from the list gets the 20th token's probability; the cap applies; coverage unchanged; single mode unaffected.
+3. Bump `MULTI_FORMAT` to 3 so the multi cache is not reused.
+
+Run after the change (Claude): the full multi benchmark with 3 shuffles and fit, then 1 shuffle, and compare with revision 2 in `docs/phase2-results.md`.
+
 ## Changelog
 
 - 2026-09-20 18:34 CEST: Rewrote the spec for the one call mode on Gemma 4 12B; DiffusionGemma moved to "not chosen".
 - 2026-09-20 19:01 CEST: Revision 2 after the first full run died at case 439: unique ids per call, grouping, format version in the cache key, failing cases counted instead of aborting.
+- 2026-09-20 20:32 CEST: Revision 3: reseeded question order per shuffle, probability floor for ids missing from the top 20 (multi mode only), MULTI_FORMAT 3.

@@ -13,7 +13,7 @@ from system1.calibrate import apply_temperature, load_calibration
 from system1.schema import Mode, Noul, QuestionBase, Request, Score, State, options
 
 MODEL = "system1-gemma-4-12b"
-MULTI_FORMAT = 2
+MULTI_FORMAT = 3
 
 
 class LowCoverageError(ValueError):
@@ -124,7 +124,7 @@ def read_multi(
                 raise LowCoverageError(
                     f"Answer id is in a merged token: {item['token']!r}"
                 )
-            results.append(read_probabilities(item["top_logprobs"], ids))
+            results.append(read_probabilities(item["top_logprobs"], ids, floor=True))
             offset += len(prefix) + 1
             needs_newline = True
     if len(results) != len(ids_per_question) or needs_newline:
@@ -133,7 +133,7 @@ def read_multi(
 
 
 def read_probabilities(
-    top_tokens: list[TopToken], ids: list[str]
+    top_tokens: list[TopToken], ids: list[str], floor: bool = False
 ) -> tuple[list[float], float]:
     mass = dict.fromkeys(ids, 0.0)
     for item in top_tokens:
@@ -149,7 +149,12 @@ def read_probabilities(
         raise LowCoverageError(
             f"Option coverage {coverage:.6f} is below 0.5; top tokens: {top_tokens!r}"
         )
-    return [value / coverage for value in mass.values()], coverage
+    total = coverage
+    if floor:
+        minimum = min(math.exp(top_tokens[-1]["logprob"]), 0.01)
+        mass = {token: value if value > 0 else minimum for token, value in mass.items()}
+        total = sum(mass.values())
+    return [value / total for value in mass.values()], coverage
 
 
 def confidence(probabilities: list[float]) -> float:
@@ -297,13 +302,14 @@ class SystemOne:
             )
         totals = {name: dict.fromkeys(values, 0.0) for name, values in labels.items()}
         coverages: dict[str, list[float]] = {name: [] for name in labels}
-        question_rng = random.Random(42)
         option_rngs = {name: random.Random(42) for name in labels}
         previous: dict[str, list[str]] = {}
         usage["calls"] = 0
         for permutation in range(request.permutations):
             order = list(request.questions)
-            question_rng.shuffle(order)
+            random.Random(1000 + permutation).shuffle(order)
+            offset = permutation % len(order)
+            order = order[offset:] + order[:offset]
             groups: list[list[str]] = [[]]
             size = 0
             for name in order:
