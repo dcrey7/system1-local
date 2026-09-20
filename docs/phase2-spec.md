@@ -131,9 +131,24 @@ Changes, multi mode only:
 
 Run after the change (Claude): the full benchmark, 3 shuffles with fit, then 1 call; compare with revisions 2 and 3 in `docs/phase2-results.md`.
 
+## Revision 5 (2026-09-20 22:28 CEST): a lower coverage guard in multi mode
+
+The revision 4 run flagged 21 of 1,600 cases as low coverage failures (17 train, 4 test) and gave them uniform guesses. In every one of them the answer token still put most of its valid mass on one id of the question (for example ` P` 0.59 to 0.81 on the `needs_human` line, ` E` 0.45 to 0.61 on the `needs_review` line), and the missing mass sat on the ids of a related question (the `action` letters ` C`, ` D`, ` E` on the `needs_human` line; ` A` on the `needs_review` line). The 0.5 guard comes from phase 1, where the one question in the prompt used ids A to E and low coverage meant a broken read. In multi mode, with unique ids across the call, mass on another question's ids is semantic leakage, and the valid mass still ranks the options.
+
+Changes, multi mode only:
+
+1. `read_probabilities(top_tokens, ids, floor=False, min_coverage=0.5)`: raise `LowCoverageError` when the coverage is below `min_coverage`. `read_multi` passes `min_coverage=0.05` together with `floor=True`. Single mode keeps 0.5 and stays byte for byte.
+2. `MULTI_FORMAT = 5`.
+3. The `coverage` field in the output already reports the real mass on the question's ids. No change there.
+4. Tests: a multi read with coverage 0.3 returns the normalised distribution over the question's own ids and reports coverage 0.3; coverage 0.02 still raises; single mode with coverage 0.3 still raises; the multi fingerprint contains `"format": 5`; formats 2, 3 and 4 are rejected.
+5. `docs/phase2-notes.md`: add a short revision 5 note.
+
+Run after the change (Claude): the full benchmark, 3 shuffles with fit, then 1 call; compare with revision 4 in `docs/phase2-results.md`.
+
 ## Changelog
 
 - 2026-09-20 18:34 CEST: Rewrote the spec for the one call mode on Gemma 4 12B; DiffusionGemma moved to "not chosen".
 - 2026-09-20 19:01 CEST: Revision 2 after the first full run died at case 439: unique ids per call, grouping, format version in the cache key, failing cases counted instead of aborting.
 - 2026-09-20 20:32 CEST: Revision 3: reseeded question order per shuffle, probability floor for ids missing from the top 20 (multi mode only), MULTI_FORMAT 3.
 - 2026-09-20 21:30 CEST: Revision 4: keep the caller's question order, no question shuffle, MULTI_FORMAT 4.
+- 2026-09-20 22:28 CEST: Revision 5: multi mode coverage guard 0.05 instead of 0.5, MULTI_FORMAT 5.

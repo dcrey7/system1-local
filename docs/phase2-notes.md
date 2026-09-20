@@ -112,6 +112,18 @@ still stop the run. No live server or benchmark was run.
 
 ## Changelog
 
+- 2026-09-20 22:29 CEST: Implemented Revision 5. Multi reads use a coverage
+  guard of 0.05 and keep the probability floor. Coverage still reports real
+  option mass. Single reads keep the default guard of 0.5. Set `MULTI_FORMAT = 5`
+  to invalidate earlier multi caches. Added tests for multi coverage of 0.3,
+  rejection at 0.02, the unchanged single guard, and rejection of cache formats
+  2, 3, and 4.
+  Validation at 2026-09-20 22:30 CEST with `UV_CACHE_DIR=/tmp/system1-uv-cache`:
+  `uv run ruff format .` reported `19 files left unchanged`;
+  `uv run ruff check .` reported `All checks passed!`;
+  `uv run pytest -q` reported `133 passed, 1 skipped in 0.81s`.
+  The live tests skipped because the server was unreachable in the sandbox.
+  No server was started or stopped.
 - 2026-09-20 21:31 CEST: Implemented Revision 4. Multi mode keeps the caller's
   question order in every permutation and across groups. Choice and noul option
   shuffles, score id rotation, and the probability floor remain unchanged.

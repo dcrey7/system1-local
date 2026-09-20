@@ -110,6 +110,35 @@ def test_read_multi_split_prefix_and_id_whitespace(prefix, answer):
     assert coverage == pytest.approx(0.8)
 
 
+def test_read_multi_normalizes_low_coverage_on_own_ids():
+    stream = [
+        generated("Q1"),
+        generated(":"),
+        generated(" C", {" A": 0.7, " C": 0.24, " D": 0.06}),
+        generated("\n"),
+    ]
+    values, coverage = read_multi(stream, [list("CD")])[0]
+    assert values == pytest.approx([0.8, 0.2])
+    assert coverage == pytest.approx(0.3)
+
+
+def test_read_multi_rejects_coverage_below_multi_guard():
+    stream = [
+        generated("Q1"),
+        generated(":"),
+        generated(" C", {" A": 0.98, " C": 0.02}),
+        generated("\n"),
+    ]
+    with pytest.raises(LowCoverageError, match="below 0.05"):
+        read_multi(stream, [list("CD")])
+
+
+def test_single_read_keeps_original_coverage_guard():
+    tokens = top_tokens({" A": 0.24, " B": 0.06, "other": 0.7})
+    with pytest.raises(LowCoverageError, match="below 0.5;"):
+        read_probabilities(tokens, list("AB"))
+
+
 @pytest.mark.parametrize("last_mass,expected_floor", [(0.004, 0.004), (0.02, 0.01)])
 def test_probability_floor_uses_last_token_and_keeps_real_coverage(
     last_mass, expected_floor

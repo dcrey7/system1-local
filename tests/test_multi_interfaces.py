@@ -145,7 +145,7 @@ def test_multi_cache_fingerprint_differs_from_phase1(tmp_path):
     assert (
         entry["fingerprint"]
         == hashlib.sha256(
-            json.dumps({**phase1, "mode": "multi", "format": 4}).encode()
+            json.dumps({**phase1, "mode": "multi", "format": 5}).encode()
         ).hexdigest()
     )
 
@@ -160,7 +160,7 @@ def test_custom_multi_calibration_path(tmp_path):
     assert not (tmp_path / "calibration_multi.json").exists()
 
 
-@pytest.mark.parametrize("old_format", [None, 2, 3])
+@pytest.mark.parametrize("old_format", [None, 2, 3, 4])
 def test_multi_format_invalidates_old_cache(tmp_path, old_format):
     path = cases_file(tmp_path / "cases.jsonl")
     cache = tmp_path / "cache.jsonl"

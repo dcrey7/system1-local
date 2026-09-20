@@ -13,7 +13,7 @@ from system1.calibrate import apply_temperature, load_calibration
 from system1.schema import Mode, Noul, QuestionBase, Request, Score, State, options
 
 MODEL = "system1-gemma-4-12b"
-MULTI_FORMAT = 4
+MULTI_FORMAT = 5
 
 
 class LowCoverageError(ValueError):
@@ -124,7 +124,11 @@ def read_multi(
                 raise LowCoverageError(
                     f"Answer id is in a merged token: {item['token']!r}"
                 )
-            results.append(read_probabilities(item["top_logprobs"], ids, floor=True))
+            results.append(
+                read_probabilities(
+                    item["top_logprobs"], ids, floor=True, min_coverage=0.05
+                )
+            )
             offset += len(prefix) + 1
             needs_newline = True
     if len(results) != len(ids_per_question) or needs_newline:
@@ -133,7 +137,10 @@ def read_multi(
 
 
 def read_probabilities(
-    top_tokens: list[TopToken], ids: list[str], floor: bool = False
+    top_tokens: list[TopToken],
+    ids: list[str],
+    floor: bool = False,
+    min_coverage: float = 0.5,
 ) -> tuple[list[float], float]:
     mass = dict.fromkeys(ids, 0.0)
     for item in top_tokens:
@@ -145,9 +152,10 @@ def read_probabilities(
         if token in mass:
             mass[token] += math.exp(logprob)
     coverage = sum(mass.values())
-    if coverage < 0.5:
+    if coverage < min_coverage:
         raise LowCoverageError(
-            f"Option coverage {coverage:.6f} is below 0.5; top tokens: {top_tokens!r}"
+            f"Option coverage {coverage:.6f} is below {min_coverage}; "
+            f"top tokens: {top_tokens!r}"
         )
     total = coverage
     if floor:
