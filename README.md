@@ -27,6 +27,93 @@ Measured on an RTX 3090 with a 4 bit Gemma 4 12B and its MTP draft. Details, per
 
 Question types: `choice` (pick one option, each with an optional description), `score` (ordered levels, returns the distribution and the expected level), `noul` (a statement, returns the probability that it is true).
 
+## Demo, step by step
+
+A real run on the RTX 3090, job fit for a candidate, five questions in one call. Script: the same calls the CLI makes, printed stage by stage.
+
+**1. The prompt.** State first, then every question with its options. Every option gets its own letter, unique across the whole call.
+
+```
+State:
+Job posting: Senior Data Scientist, fintech, Paris. Build credit risk models ... Salary 70 to 85k EUR.
+Candidate: 5 years data science across Amazon, EXL, AXA. Python, SQL, PyTorch ... French A2 ...
+
+Questions:
+Q1: How well does the candidate match this job
+  A. weak: missing core requirements
+  B. medium: most requirements, a real gap
+  C. strong: all core requirements
+Q2: Is this statement true? We should apply to this job
+  D. yes
+  E. no
+Q3: Is this statement true? The French level is a real risk for this role
+  F. yes
+  G. no
+Q4: Seniority of the candidate for this role
+  H. junior
+  I. mid
+  J. senior
+Q5: How well the salary band matches this profile
+  K. low
+  L. fair
+  M. good
+
+Answer every question with its option id only, one per line, in the form "Q1: <id>".
+```
+
+**2. The grammar.** The model is allowed to write exactly this shape and nothing else.
+
+```
+root ::= q0 q1 q2 q3 q4
+q0 ::= "Q1: " ("A" | "B" | "C") "\n"
+q1 ::= "Q2: " ("D" | "E") "\n"
+q2 ::= "Q3: " ("F" | "G") "\n"
+q3 ::= "Q4: " ("H" | "I" | "J") "\n"
+q4 ::= "Q5: " ("K" | "L" | "M") "\n"
+```
+
+**3. The reply.** 313 prompt tokens in, 26 tokens out, 428 ms, one call.
+
+```
+Q1: C
+Q2: D
+Q3: G
+Q4: J
+Q5: L
+```
+
+**4. What the server hands back at each answer letter.** The top of the model's own distribution before that letter was chosen. This is where the confidence comes from.
+
+```
+fit          ' C'  C 1.000  B 0.000  A 0.000
+apply        ' D'  D 1.000  E 0.000
+french_risk  ' G'  G 0.630  F 0.369
+seniority    ' J'  J 1.000  I 0.000
+salary_fit   ' L'  L 0.985  M 0.014  K 0.000
+```
+
+**5. Read over the question's own letters and normalise.**
+
+```
+fit          weak 0.000  medium 0.000  strong 1.000
+apply        yes 1.000   no 0.000
+french_risk  yes 0.369   no 0.631
+seniority    junior 0.000  mid 0.000  senior 1.000
+salary_fit   low 0.000  fair 0.985  good 0.014
+```
+
+**6. The product answer.** Three shuffled calls averaged, then the per type temperature, 1.0 s in total. The raw 1.000s become honest numbers.
+
+```
+fit          strong   confidence 0.70   weak 0.02  medium 0.18  strong 0.80
+apply        true with probability 0.85
+french_risk  true with probability 0.43
+seniority    senior   confidence 0.88   junior 0.02  mid 0.06  senior 0.92
+salary_fit   fair     confidence 0.15   low 0.33  fair 0.44  good 0.23
+```
+
+Repeated runs move these by a few points: the server's speculative decoding and prompt cache are not bit exact between runs.
+
 ## Requirements
 
 - Python 3.12 and [uv](https://docs.astral.sh/uv/).
